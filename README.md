@@ -187,7 +187,7 @@ SCPro/
 ├── vscode_theme.py          # reads VS Code theme/icons into web/assets
 ├── install.sh               # desktop entry / autostart
 ├── scpro.svg                # app and tray icon
-├── docs/                    # screenshots
+├── docs/                    # screenshots and social card
 ├── deploy/
 │   ├── deploy_one.sh        # deployment engine
 │   ├── name_suffix.sh       # shared suffix rules

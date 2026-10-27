@@ -180,7 +180,7 @@ SCPro/
 ├── vscode_theme.py          # 读取 VS Code 主题/图标到 web/assets
 ├── install.sh               # 应用菜单 / 开机自启
 ├── scpro.svg                # 应用与托盘图标
-├── docs/                    # 界面截图
+├── docs/                    # 截图与社交预览
 ├── deploy/
 │   ├── deploy_one.sh        # 部署引擎
 │   ├── name_suffix.sh       # 公共后缀规则
