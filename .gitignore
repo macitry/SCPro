@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# 本地私有配置：由 deploy/*.example.* 在首次运行时自动生成，永远不要提交
+# ---------------------------------------------------------------------------
+/deploy/projects.yaml
+/deploy/deploy_config.yaml
+/deploy/deploy_secrets.yaml
+/deploy/ssh_config
+/deploy/robot_connections.yaml
+
+# 运行时产物
+/logs/
+/upload_tmp/
+/settings.json
+/.instance.lock
+
+# 备份与临时文件（deploy_core 写 YAML 前会生成 .bak）
+*.bak
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store

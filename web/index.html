@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SCPro</title>
+  <link rel="stylesheet" href="assets/codicon.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <nav class="activity">
+      <button class="act active" data-view="projects" data-i18n-title="tab.projects" title="项目">
+        <span class="codicon codicon-files"></span>
+      </button>
+      <button class="act" data-view="hosts" data-i18n-title="tab.hosts" title="Hosts" aria-expanded="true">
+        <span class="codicon codicon-server"></span>
+      </button>
+      <button class="act" data-view="log" data-i18n-title="tab.log" title="输出">
+        <span class="codicon codicon-terminal"></span>
+      </button>
+      <div class="flex1"></div>
+      <button class="act" id="btn-settings" data-i18n-title="tab.settings" title="设置">
+        <span class="codicon codicon-gear"></span>
+      </button>
+    </nav>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="side-head">
+        <span data-i18n="hosts.header">HOSTS</span>
+        <span>
+          <button id="btn-host-settings" class="icon" data-i18n-title="hosts.settings" title="Host 设置">⚙</button>
+          <button id="btn-refresh" class="icon" data-i18n-title="hosts.refresh" title="从 ~/.ssh/config 刷新">⟳</button>
+        </span>
+      </div>
+      <div class="side-search">
+        <input id="host-search" type="search" data-i18n-placeholder="hosts.search" placeholder="搜索 Host…" autocomplete="off">
+      </div>
+      <div id="host-list" class="host-list"></div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <span class="dot" id="host-dot"></span>
+        <span id="host-name" class="host-name">—</span>
+        <span id="host-conn" class="muted"></span>
+        <span id="host-auth" class="codicon codicon-key auth-key"></span>
+        <span id="host-warning" class="warn-text hidden" data-i18n="host.warning">没有项目规则匹配该 Host</span>
+        <div class="flex1"></div>
+        <button id="btn-test" class="btn" data-i18n="btn.test_short">测试</button>
+        <button id="btn-more" class="icon" data-i18n-title="menu.more" title="更多">⋯</button>
+        <button id="btn-run" class="btn primary" data-i18n="btn.run">上传选中</button>
+      </div>
+
+      <div id="run-summary" class="run-summary hidden">
+        <span id="run-summary-text"></span>
+        <div class="flex1"></div>
+        <button id="btn-retry-failed" class="btn" data-i18n="btn.retry">重试失败项</button>
+        <button id="btn-dismiss-summary" class="icon">✕</button>
+      </div>
+
+      <div class="list-head">
+        <span class="c-check"></span>
+        <span class="c-main project-heading">
+          <span data-i18n="col.project_route">项目 / 部署路径</span>
+          <input id="project-search" type="search" data-i18n-placeholder="project.search"
+                 placeholder="搜索项目…" autocomplete="off">
+          <button id="btn-new" class="mini" data-i18n-title="btn.new" title="新建项目">＋</button>
+        </span>
+        <span class="c-act" data-i18n="col.actions">操作</span>
+      </div>
+      <div id="project-list" class="project-list"></div>
+    </main>
+  </div>
+
+  <section class="panel" id="panel" aria-hidden="false">
+    <div id="panel-resizer" class="panel-resizer"></div>
+    <div class="panel-head">
+      <span class="panel-title" data-i18n="panel.output">输出</span>
+      <div class="flex1"></div>
+      <input id="log-search" class="log-search" data-i18n-placeholder="panel.search" placeholder="筛选日志…" autocomplete="off">
+      <select id="log-level" class="log-level">
+        <option value="all" data-i18n="filter.all">全部</option>
+        <option value="problem" data-i18n="filter.problem">只看问题</option>
+        <option value="progress" data-i18n="filter.progress">只看进度</option>
+        <option value="info" data-i18n="filter.info">只看信息</option>
+      </select>
+      <label class="inline-check"><input id="log-autoscroll" type="checkbox" checked><span data-i18n="panel.autoscroll">自动滚动</span></label>
+      <button id="btn-open-logs" class="icon" data-i18n="panel.logdir">日志目录</button>
+      <button id="btn-clear" class="icon" data-i18n="panel.clear">清空</button>
+      <button id="btn-stop" class="icon" data-i18n="panel.stop">停止</button>
+      <button id="btn-toggle" class="icon">▾</button>
+    </div>
+    <pre id="log" class="log"></pre>
+  </section>
+
+  <footer class="statusbar">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text" data-i18n="status.ready">就绪</span>
+    <div class="flex1"></div>
+    <span id="status-host"></span>
+    <span id="status-progress"></span>
+  </footer>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="modal-ok" class="btn primary" data-i18n="btn.ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editor" class="overlay hidden">
+    <div class="modal editor-modal">
+      <div class="modal-title" id="ed-title" data-i18n="editor.edit">编辑项目</div>
+      <div class="form-grid">
+        <label for="ed-name" data-i18n="editor.name">项目名</label>
+        <input id="ed-name" autocomplete="off">
+        <label for="ed-src" data-i18n="editor.src">本地源码</label>
+        <div class="inline">
+          <input id="ed-src" autocomplete="off">
+          <button id="ed-browse" class="btn" data-i18n="editor.browse">选择…</button>
+        </div>
+        <label for="ed-remote" data-i18n="editor.remote">远端目录名</label>
+        <input id="ed-remote" autocomplete="off" data-i18n-placeholder="editor.remote_ph" placeholder="留空则取源码目录最后一段">
+      </div>
+      <div class="section-head">
+        <span data-i18n="editor.rules">Host 规则（按顺序匹配，第一条命中即用）</span>
+        <button id="ed-add-rule" class="mini" data-i18n="editor.add">＋ 添加</button>
+      </div>
+      <table class="rules" id="ed-rules">
+        <thead><tr><th data-i18n="editor.rule_match">Host 匹配</th><th data-i18n="editor.rule_base">远端基路径</th><th data-i18n="editor.rule_subdir">子目录</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="ed-preview" class="hint"></div>
+      <div class="section-head">
+        <span data-i18n="editor.excludes">排除项</span>
+        <select id="ed-profile"></select>
+      </div>
+      <div id="ed-tree" class="tree"></div>
+      <div class="modal-actions">
+        <button id="ed-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="ed-save" class="btn primary" data-i18n="btn.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="secrets" class="overlay hidden">
+    <div class="modal secrets-modal">
+      <div class="modal-title" data-i18n="secrets.title">SSH 密码</div>
+      <label class="check"><input id="show-secrets" type="checkbox"> <span data-i18n="secrets.show">显示密码</span></label>
+      <div id="secret-list" class="secret-list"></div>
+      <div class="modal-actions">
+        <button id="secret-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="secret-save" class="btn primary" data-i18n="btn.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings" class="overlay hidden">
+    <div class="modal settings-modal">
+      <div class="modal-title" data-i18n="settings.title">设置</div>
+      <label class="check"><input id="set-notify" type="checkbox"> <span data-i18n="settings.notify">任务结束时弹托盘通知</span></label>
+      <label class="check"><input id="set-autostart" type="checkbox"> <span data-i18n="settings.autostart">登录桌面后自动启动 SCPro</span></label>
+      <label class="check"><input id="set-delete-remote" type="checkbox"> <span data-i18n="settings.delete_remote">上传时删除远端多余文件（谨慎开启）</span></label>
+      <div class="form-line">
+        <label for="set-language" data-i18n="settings.language">语言</label>
+        <select id="set-language">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="form-line">
+        <label for="set-suffix" data-i18n="settings.suffix">默认目录后缀</label>
+        <input id="set-suffix" data-i18n-placeholder="settings.suffix_ph" placeholder="留空 = 当天日期，- = 不加后缀">
+      </div>
+      <div class="form-line">
+        <label for="set-theme-select" data-i18n="settings.theme_select">主题</label>
+        <select id="set-theme-select"></select>
+      </div>
+      <div class="hint" id="set-theme"></div>
+      <div class="hint" id="set-version"></div>
+      <button id="set-reload-theme" class="btn" data-i18n="settings.reload_theme">重新加载 VS Code 主题</button>
+      <button id="set-clear-cache" class="btn" data-i18n="settings.clear_cache">清理本地打包缓存</button>
+      <div class="modal-actions">
+        <button id="set-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="set-save" class="btn primary" data-i18n="btn.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="hosts" class="overlay hidden">
+    <div class="modal host-modal">
+      <div class="modal-title" data-i18n="hosts.title">Host 设置</div>
+      <div class="section-head" data-i18n="hosts.ignore">忽略名单（每行一个通配模式，如 *-host）</div>
+      <textarea id="host-ignore" spellcheck="false"></textarea>
+      <div class="section-head" data-i18n="hosts.ports">端口（留空或与原值相同表示使用 ssh_config）</div>
+      <div id="host-edit-list" class="host-edit-list"></div>
+      <div class="modal-actions">
+        <button id="btn-passwords" class="btn" data-i18n="secrets.title">SSH 密码</button>
+        <div class="flex1"></div>
+        <button id="host-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="host-save" class="btn primary" data-i18n="btn.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="context-menu" class="context-menu hidden" role="menu"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

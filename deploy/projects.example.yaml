@@ -1,0 +1,78 @@
+# ==============================================================================
+# 项目清单（示例模板）
+#
+# 首次运行时会自动复制为 deploy/projects.yaml，后者已被 .gitignore 排除，
+# 随便写你的真实项目、路径和 Host 规则，不会进仓库。
+#
+# 核心概念只有两个：Host（发到哪）和 Project（发什么）。
+# 目标机由 Host 名字本身表达，项目用 Host 名字的通配规则决定远端路径。
+# ==============================================================================
+
+# --- Host 名单 ---------------------------------------------------------------
+# Host 从 ~/.ssh/config 读取（刷新时同步到 deploy/ssh_config）。
+# ignore: 按名字通配，排除跳板/仓库之类的非部署目标。
+# ports:  可选覆盖 ssh_config 里的 Port。
+hosts:
+  ignore:
+    - "*-host"
+    - "remote-repo"
+  ports: {}
+
+# --- 排除模板 ----------------------------------------------------------------
+# 项目里用 excludes.use 引用，add 追加、remove 去掉。
+exclude_profiles:
+  ros2_pkg:
+    - ".git"
+    - ".gitignore"
+    - ".vscode"
+    - ".idea"
+    - "*.swp"
+    - "*.swo"
+    - "*~"
+    - "build"
+    - "install"
+    - "log"
+    - "__pycache__"
+    - "*.pyc"
+    - "*.pyo"
+    - "*.log"
+    - "CMakeCache.txt"
+    - "CMakeFiles"
+    - "cmake_install.cmake"
+    - "CTestTestfile.cmake"
+    - "Makefile"
+  python_pkg:
+    - ".git"
+    - ".gitignore"
+    - ".vscode"
+    - "__pycache__"
+    - "*.pyc"
+    - "*.pyo"
+    - "*.log"
+    - ".venv"
+  plain:
+    - ".git"
+    - "*~"
+
+# --- 项目清单 ----------------------------------------------------------------
+# local_src   本地源码目录：相对 workspace_root，也支持 /绝对 和 ~
+# remote_name 远端落地目录名（后缀会跟在它后面，见 deploy_config.yaml）
+# targets     Host 名字规则，按顺序匹配，第一条命中即用：
+#               match:  通配符（如 "*-mc" / "*-ai"）
+#               base:   远端基路径
+#               subdir: 相对 base 的子目录（"." = 直接放在 base 下）
+# excludes    排除规则：{use: 模板名, add: [...], remove: [...]}
+projects:
+  demo_repo:
+    local_src: "demo/robot_ws"
+    remote_name: "demo_repo"
+    targets:
+      - match: "*-mc"
+        base: "/home/robot/workspace"
+        subdir: "."
+      - match: "*-ai"
+        base: "/home/robot/workspace"
+        subdir: "."
+    excludes:
+      use: ros2_pkg
+      add: ["*.deb"]
