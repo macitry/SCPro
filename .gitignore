@@ -26,3 +26,11 @@ __pycache__/
 .idea/
 *.swp
 .DS_Store
+
+# Debian 打包产物（.deb 默认生成在源码目录的上一级）
+/debian/scpro/
+/debian/files
+/debian/*.substvars
+*.deb
+*.buildinfo
+*.changes

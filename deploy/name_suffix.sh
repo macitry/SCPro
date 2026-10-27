@@ -22,7 +22,7 @@
 #   suffix="$(resolve_name_suffix "_wcz")"   # 强制指定
 #===============================================================================
 
-NAME_SUFFIX_YAML="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/deploy_config.yaml"
+NAME_SUFFIX_YAML="${SCPRO_CONFIG_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)}/deploy_config.yaml"
 
 # 内部: 去掉首尾空白
 _name_suffix_trim() {

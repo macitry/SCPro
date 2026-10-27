@@ -34,7 +34,7 @@ LOCAL_SRC_APP_DIR="$(dirname "$LOCAL_SRC_SCRIPT_DIR")"
 #   与 deploy_core.py 的 workspace_root() 保持同一规则。
 #===============================================================================
 workspace_root_from_config() {
-    local yaml="${LOCAL_SRC_SCRIPT_DIR}/deploy_config.yaml"
+    local yaml="${SCPRO_CONFIG_DIR:-$LOCAL_SRC_SCRIPT_DIR}/deploy_config.yaml"
     [[ -f "$yaml" ]] || return 0
     sed -n 's/^workspace_root:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$yaml" | head -1 | xargs
 }
@@ -43,7 +43,11 @@ resolve_workspace_root() {
     local raw="${DEPLOY_WORKSPACE_ROOT:-}"
     [[ -z "$raw" ]] && raw="$(workspace_root_from_config)"
     if [[ -z "$raw" ]]; then
-        printf '%s' "$(dirname "$LOCAL_SRC_APP_DIR")"
+        if [[ "${SCPRO_PORTABLE:-1}" == "1" ]]; then
+            printf '%s' "$(dirname "$LOCAL_SRC_APP_DIR")"
+        else
+            printf '%s' "$HOME"
+        fi
         return 0
     fi
     case "$raw" in
@@ -90,7 +94,7 @@ resolve_local_src() {
 #===============================================================================
 local_src_from_config() {
     local section="${1:-}"
-    local yaml="${LOCAL_SRC_SCRIPT_DIR}/deploy_config.yaml"
+    local yaml="${SCPRO_CONFIG_DIR:-$LOCAL_SRC_SCRIPT_DIR}/deploy_config.yaml"
 
     if [[ -z "$section" || ! -f "$yaml" ]]; then
         return 1

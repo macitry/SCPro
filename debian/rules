@@ -1,0 +1,80 @@
+#!/usr/bin/make -f
+#
+# 极简构建规则：不依赖 debhelper，只用 dpkg-dev 自带的工具。
+# 本地 (`dpkg-buildpackage -b`) 与 Launchpad (PPA) 都能直接使用。
+
+PACKAGE  := scpro
+VERSION  := $(shell dpkg-parsechangelog -S Version)
+ARCH     := all
+DEST     := $(CURDIR)/debian/$(PACKAGE)
+DOCDIR   := $(DEST)/usr/share/doc/$(PACKAGE)
+SHAREDIR := $(DEST)/usr/share/$(PACKAGE)
+DEB      := $(CURDIR)/../$(PACKAGE)_$(VERSION)_$(ARCH).deb
+
+%:
+	@echo "debian/rules: no rule for '$@'" >&2
+	@exit 1
+
+clean:
+	rm -rf $(DEST)
+	rm -f debian/files debian/$(PACKAGE).substvars
+	rm -f $(DEB)
+
+build:
+	@echo "SCPro is a Python application; nothing to compile."
+
+build-arch: build
+	@:
+
+build-indep: build
+	@:
+
+.PHONY: clean build build-arch build-indep binary binary-indep
+
+binary: binary-indep
+	@:
+
+binary-indep: build
+	install -d $(SHAREDIR) $(DEST)/usr/bin \
+	           $(DEST)/usr/share/applications \
+	           $(DEST)/usr/share/icons/hicolor/scalable/apps \
+	           $(DEST)/usr/share/man/man1 $(DOCDIR)
+
+	install -m 644 main.py backend.py deploy_core.py vscode_theme.py $(SHAREDIR)/
+	cp -a web $(SHAREDIR)/web
+	rm -f $(SHAREDIR)/web/assets/folder.svg \
+	      $(SHAREDIR)/web/assets/folder-open.svg \
+	      $(SHAREDIR)/web/assets/file.svg
+
+	cp -a deploy $(SHAREDIR)/deploy
+	rm -f $(SHAREDIR)/deploy/projects.yaml \
+	      $(SHAREDIR)/deploy/deploy_config.yaml \
+	      $(SHAREDIR)/deploy/deploy_secrets.yaml \
+	      $(SHAREDIR)/deploy/ssh_config \
+	      $(SHAREDIR)/deploy/robot_connections.yaml
+	rm -f $(SHAREDIR)/deploy/*.bak $(SHAREDIR)/deploy/*.tmp
+	rm -rf $(SHAREDIR)/deploy/__pycache__
+
+	install -m 644 scpro.svg $(SHAREDIR)/scpro.svg
+	install -m 644 scpro.svg $(DEST)/usr/share/icons/hicolor/scalable/apps/scpro.svg
+	install -m 644 debian/scpro.desktop $(DEST)/usr/share/applications/scpro.desktop
+	install -m 755 debian/scpro.launcher $(DEST)/usr/bin/scpro
+	install -m 644 debian/scpro.1 $(DEST)/usr/share/man/man1/scpro.1
+	gzip -9n $(DEST)/usr/share/man/man1/scpro.1
+
+	install -m 644 debian/copyright $(DOCDIR)/copyright
+	install -m 644 LICENSE $(DOCDIR)/LICENSE
+	gzip -9nc debian/changelog > $(DOCDIR)/changelog.Debian.gz
+	chmod 644 $(DOCDIR)/changelog.Debian.gz
+
+	install -d $(DEST)/DEBIAN
+	dpkg-gencontrol -p$(PACKAGE) -P$(DEST)
+	(cd $(DEST) && find . -type f ! -path './DEBIAN/*' -printf '%P\n' \
+	    | sort | xargs -r md5sum > DEBIAN/md5sums)
+
+	find $(DEST) -type d -exec chmod 755 {} +
+	find $(DEST) -type f -exec chmod 644 {} +
+	chmod 755 $(DEST)/usr/bin/scpro
+
+	dpkg-deb --build --root-owner-group $(DEST) $(DEB)
+	@echo "$(notdir $(DEB)) utils optional" > debian/files

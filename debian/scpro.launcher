@@ -1,0 +1,5 @@
+#!/bin/sh
+# Debian launcher: never write bytecode into /usr/share
+PYTHONDONTWRITEBYTECODE=1
+export PYTHONDONTWRITEBYTECODE
+exec /usr/bin/python3 /usr/share/scpro/main.py "$@"

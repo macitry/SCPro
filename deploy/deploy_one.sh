@@ -31,25 +31,42 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # SCPro/deploy
-APP_DIR="$(dirname "$SCRIPT_DIR")"                            # SCPro
-PROJECTS_YAML="${SCRIPT_DIR}/projects.yaml"
-DEPLOY_YAML="${SCRIPT_DIR}/deploy_config.yaml"
-DEPLOY_DIR="${SCRIPT_DIR}"
-# SSH 配置来源：~/.ssh/config 优先，缺失时用项目自带副本
-#（DEPLOY_SSH_CONFIG 可显式指定，用于测试或特殊环境）
-if [[ -n "${DEPLOY_SSH_CONFIG:-}" ]]; then
-    SSH_CONFIG="$DEPLOY_SSH_CONFIG"
-elif [[ -f "${HOME}/.ssh/config" ]]; then
-    SSH_CONFIG="${HOME}/.ssh/config"
-else
-    SSH_CONFIG="${SCRIPT_DIR}/ssh_config"
-fi
-SECRETS_YAML="${SCRIPT_DIR}/deploy_secrets.yaml"
-CONNECTIONS_YAML="${SCRIPT_DIR}/robot_connections.yaml"
-UPLOAD_TMP_DIR="${APP_DIR}/upload_tmp"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # 引擎与模板（安装后只读）
+APP_DIR="$(dirname "$SCRIPT_DIR")"                            # 程序根目录
+TEMPLATE_DIR="$SCRIPT_DIR"
 
-# 首次运行：缺少本地私有配置时，从仓库内模板生成（真实配置不进仓库）
+# 配置目录：GUI 会传 SCPRO_CONFIG_DIR；命令行独立运行时自动判断便携 / XDG
+if [[ -n "${SCPRO_CONFIG_DIR:-}" ]]; then
+    CONFIG_DIR="$SCPRO_CONFIG_DIR"
+    PORTABLE="${SCPRO_PORTABLE:-0}"
+elif [[ "${SCPRO_PORTABLE:-auto}" == "0" ]]; then
+    CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scpro"
+    PORTABLE=0
+elif [[ -f "${SCRIPT_DIR}/projects.yaml" ]]; then
+    CONFIG_DIR="$SCRIPT_DIR"
+    PORTABLE=1
+else
+    CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scpro"
+    PORTABLE=0
+fi
+mkdir -p "$CONFIG_DIR"
+
+PROJECTS_YAML="${CONFIG_DIR}/projects.yaml"
+DEPLOY_YAML="${CONFIG_DIR}/deploy_config.yaml"
+SECRETS_YAML="${CONFIG_DIR}/deploy_secrets.yaml"
+CONNECTIONS_YAML="${CONFIG_DIR}/robot_connections.yaml"
+SSH_CONFIG="${CONFIG_DIR}/ssh_config"
+
+# 本地打包缓存
+if [[ -n "${SCPRO_UPLOAD_DIR:-}" ]]; then
+    UPLOAD_TMP_DIR="$SCPRO_UPLOAD_DIR"
+elif [[ "$PORTABLE" == "1" ]]; then
+    UPLOAD_TMP_DIR="${APP_DIR}/upload_tmp"
+else
+    UPLOAD_TMP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/scpro/upload_tmp"
+fi
+
+# 首次运行：缺少本地私有配置时，从模板目录生成（真实配置不进仓库）
 for _pair in \
     "projects.yaml:projects.example.yaml" \
     "deploy_config.yaml:deploy_config.example.yaml" \
@@ -59,15 +76,26 @@ for _pair in \
 do
     _name="${_pair%%:*}"
     _example="${_pair##*:}"
-    if [[ ! -f "${SCRIPT_DIR}/${_name}" && -f "${SCRIPT_DIR}/${_example}" ]]; then
-        cp -p "${SCRIPT_DIR}/${_example}" "${SCRIPT_DIR}/${_name}"
+    if [[ ! -f "${CONFIG_DIR}/${_name}" && -f "${TEMPLATE_DIR}/${_example}" ]]; then
+        cp -p "${TEMPLATE_DIR}/${_example}" "${CONFIG_DIR}/${_name}"
         if [[ "$_name" == "deploy_secrets.yaml" ]]; then
-            chmod 600 "${SCRIPT_DIR}/${_name}"
+            chmod 600 "${CONFIG_DIR}/${_name}"
         fi
         echo "[INFO] 已从 ${_example} 生成本地配置 ${_name}"
     fi
 done
 unset _pair _name _example
+
+export SCPRO_CONFIG_DIR="$CONFIG_DIR"
+export SCPRO_PORTABLE="$PORTABLE"
+
+# SSH 配置来源：~/.ssh/config 优先，缺失时用配置目录里的副本
+#（DEPLOY_SSH_CONFIG 可显式指定，用于测试或特殊环境）
+if [[ -n "${DEPLOY_SSH_CONFIG:-}" ]]; then
+    SSH_CONFIG="$DEPLOY_SSH_CONFIG"
+elif [[ -f "${HOME}/.ssh/config" ]]; then
+    SSH_CONFIG="${HOME}/.ssh/config"
+fi
 
 # shellcheck source=name_suffix.sh
 source "${SCRIPT_DIR}/name_suffix.sh"
@@ -362,7 +390,7 @@ _assert_safe_local_pkg() {
         return 1
     fi
     for critical in "$HOME" "$WORKSPACE_DIR" "$APP_DIR" \
-                    "$DEPLOY_DIR" "$UPLOAD_TMP_DIR" "$source"; do
+                    "$TEMPLATE_DIR" "$CONFIG_DIR" "$UPLOAD_TMP_DIR" "$source"; do
         if [[ "$target" == "$critical" ]]; then
             echo "[ERROR] 拒绝将受保护目录作为打包缓存: $target" >&2
             return 1

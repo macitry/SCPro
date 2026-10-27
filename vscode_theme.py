@@ -4,7 +4,7 @@
 
 - 颜色：解析 workbench.colorTheme 指向的主题 JSON（支持 JSONC 与 include）
 - 图标：复制 VS Code 自带 codicon 字体，以及当前图标主题的 folder/file 图标
-- 资源写到 SCPro/web/assets/，CSS 通过变量消费
+- 图标写到可写资源目录（便携模式是 web/assets，安装模式是用户缓存目录）
 """
 
 from __future__ import annotations
@@ -22,7 +22,10 @@ CODICON = Path("/usr/share/code/resources/app/node_modules/@vscode/codicons/dist
 
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
-ASSET_DIR = WEB_DIR / "assets"
+
+import deploy_core as core  # noqa: E402
+
+ASSET_DIR = core.ASSET_DIR
 
 FALLBACK = {
     "bg": "#fdf6e3",
@@ -307,7 +310,7 @@ def _copy_icon(theme_json: Path, definition: str, dest_name: str, icons: dict) -
         return ""
     dest = ASSET_DIR / dest_name
     shutil.copy2(src, dest)
-    return "assets/" + dest_name
+    return ("assets/" + dest_name) if core.PORTABLE else dest.as_uri()
 
 
 def load(theme_id: str = "") -> dict:
@@ -465,11 +468,17 @@ def load(theme_id: str = "") -> dict:
                                    "file.svg", icon_data)
     icons = {k: v for k, v in icons.items() if v}
 
-    # VS Code 自带 codicon 字体
+    # VS Code 自带 codicon 字体：仓库/安装包已自带，缺失时才从本机复制
     for name in ("codicon.css", "codicon.ttf"):
         src = CODICON / name
-        if src.is_file():
-            shutil.copy2(src, ASSET_DIR / name)
+        target = WEB_DIR / "assets" / name
+        if not src.is_file() or target.exists():
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target)
+        except OSError:
+            pass
 
     return {
         "id": selected["id"] if selected else "",

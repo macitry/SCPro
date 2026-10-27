@@ -1,0 +1,43 @@
+name: deb
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev lintian
+
+      - name: Build package
+        run: |
+          dpkg-buildpackage -b -us -uc -d
+          mkdir -p dist
+          mv ../scpro_*.deb dist/
+          mv ../scpro_*.buildinfo dist/ || true
+          mv ../scpro_*.changes dist/ || true
+
+      - name: Lintian (report only)
+        run: lintian dist/scpro_*.deb || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scpro-deb
+          path: dist/*.deb
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""界面与部署核心之间的适配层（全部路径都在 app 目录内）。"""
+"""界面与部署核心之间的适配层。"""
 
 from __future__ import annotations
 
@@ -8,12 +8,15 @@ import sys
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
-DEPLOY_DIR = APP_DIR / "deploy"
-UPLOAD_DIR = APP_DIR / "upload_tmp"
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 import deploy_core as core  # noqa: E402 - 先注册 app 目录
+
+DEPLOY_DIR = core.DEPLOY_DIR
+CONFIG_DIR = core.CONFIG_DIR
+STATE_DIR = core.STATE_DIR
+UPLOAD_DIR = core.UPLOAD_DIR
 
 
 def snapshot() -> dict:

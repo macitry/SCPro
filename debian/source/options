@@ -1,0 +1,15 @@
+# 源码包（PPA 上传）里绝不能带上真实的本地配置
+tar-ignore = .git
+tar-ignore = .github
+tar-ignore = __pycache__
+tar-ignore = logs
+tar-ignore = upload_tmp
+tar-ignore = settings.json
+tar-ignore = deploy/projects.yaml
+tar-ignore = deploy/deploy_config.yaml
+tar-ignore = deploy/deploy_secrets.yaml
+tar-ignore = deploy/ssh_config
+tar-ignore = deploy/robot_connections.yaml
+tar-ignore = *.deb
+tar-ignore = *.buildinfo
+tar-ignore = *.changes

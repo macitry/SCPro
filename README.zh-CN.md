@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt5](https://img.shields.io/badge/PyQt5-5.15-41CD52?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624?logo=linux&logoColor=black)](#快速开始)
-[![License](https://img.shields.io/badge/License-TBD-lightgrey)](#许可证)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 [English](README.md) · 简体中文
 
@@ -90,25 +90,49 @@ sudo apt install sshpass
 ./main.py --check    # 不开窗口，打印解析后的 Host / 项目
 ```
 
-可选的桌面集成：
+可选的桌面集成（便携安装）：
 
 ```bash
 ./install.sh               # 安装到应用菜单
 ./install.sh --autostart   # 同时开启开机自启
 ```
 
+### 安装 deb 包
+
+每次打 tag 发布时都会自动构建 `.deb`，从
+[Releases](https://github.com/macitry/SCPro/releases) 下载后：
+
+```bash
+sudo apt install ./scpro_2.0.0_all.deb
+scpro
+```
+
+程序安装到 `/usr/share/scpro`，用户数据分别放在
+`~/.config/scpro`、`~/.local/state/scpro` 和 `~/.cache/scpro`。
+打包与 PPA 流程见 [docs/PACKAGING.md](docs/PACKAGING.md)。
+
 ### 首次运行
 
-真实配置**不会**进仓库。首次启动时会把 `deploy/*.example.*` 复制成本地文件，
-这些文件都写进了 `.gitignore`：
+真实配置**不会**进仓库。首次启动时把内置的 `*.example.*` 模板复制到当前配置目录
+（便携模式是 `deploy/`，安装模式是 `~/.config/scpro`），这些副本都写进了 `.gitignore`：
 
-| 本地文件 | 模板 | 用途 |
+| 配置文件 | 模板 | 用途 |
 | --- | --- | --- |
-| `deploy/projects.yaml` | `projects.example.yaml` | 项目、Host 规则、排除模板 |
-| `deploy/deploy_config.yaml` | `deploy_config.example.yaml` | 当前 Host、目录后缀、`workspace_root` |
-| `deploy/deploy_secrets.yaml` | `deploy_secrets.example.yaml` | SSH 密码（生成时权限 `600`） |
-| `deploy/ssh_config` | `ssh_config.example` | `~/.ssh/config` 的镜像 / 兜底 |
-| `deploy/robot_connections.yaml` | `robot_connections.example.yaml` | 老配置的密码键映射（可选） |
+| `projects.yaml` | `projects.example.yaml` | 项目、Host 规则、排除模板 |
+| `deploy_config.yaml` | `deploy_config.example.yaml` | 当前 Host、目录后缀、`workspace_root` |
+| `deploy_secrets.yaml` | `deploy_secrets.example.yaml` | SSH 密码（生成时权限 `600`） |
+| `ssh_config` | `ssh_config.example` | `~/.ssh/config` 的镜像 / 兜底 |
+| `robot_connections.yaml` | `robot_connections.example.yaml` | 老配置的密码键映射（可选） |
+
+### 文件位置
+
+| 模式 | 触发条件 | 配置 | 日志 | 缓存 |
+| --- | --- | --- | --- | --- |
+| 便携 | 程序目录可写（git clone、拷贝的文件夹） | `deploy/` | `logs/` | `upload_tmp/`、`web/assets/` |
+| 安装 | 程序目录只读（deb 包） | `~/.config/scpro` | `~/.local/state/scpro/logs` | `~/.cache/scpro` |
+
+支持 `XDG_CONFIG_HOME`、`XDG_STATE_HOME`、`XDG_CACHE_HOME`；
+`SCPRO_PORTABLE=0` 或 `1` 可强制指定模式。
 
 ## 配置
 
@@ -178,9 +202,11 @@ SCPro/
 ├── backend.py               # 界面与部署核心之间的适配层
 ├── deploy_core.py           # 配置、Host、项目、密码（无 Qt）
 ├── vscode_theme.py          # 读取 VS Code 主题/图标到 web/assets
-├── install.sh               # 应用菜单 / 开机自启
+├── install.sh               # 应用菜单 / 开机自启（便携安装）
 ├── scpro.svg                # 应用与托盘图标
-├── docs/                    # 截图与社交预览
+├── LICENSE                  # MIT
+├── debian/                  # Debian/Ubuntu 打包（不依赖 debhelper）
+├── docs/                    # 截图、社交预览、打包说明
 ├── deploy/
 │   ├── deploy_one.sh        # 部署引擎
 │   ├── name_suffix.sh       # 公共后缀规则
@@ -207,11 +233,12 @@ SCPro/
 - 没有构建步骤：改完 `web/*` 重启应用即可。
 - JS → Python 走 `scpro://` 导航协议，Python → JS 用 `runJavaScript`；
   不需要 QWebChannel，也不需要 Node 工具链。
+- 本地构建 deb：`dpkg-buildpackage -b -us -uc -d`（构建规则不依赖 debhelper）。
 
 ## 许可证
 
-目前还没有添加许可证。在补充 `LICENSE` 之前，代码默认保留所有权利。
-如果准备开源，MIT 或 Apache-2.0 都是合适的选择。
+[MIT](LICENSE) © 2026 macitry。
 
-第三方资源：codicon 字体与图标来自 Visual Studio Code（MIT）；
-folder/file 图标来自本机安装的 VS Code 图标主题。
+第三方资源：codicon 字体与样式表来自 Visual Studio Code（MIT），详见
+`debian/copyright`。folder/file 图标**不随包分发**——运行时从用户本机的
+VS Code 图标主题生成。

@@ -10,7 +10,7 @@ verifies the target, and streams it over rsync.
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt5](https://img.shields.io/badge/PyQt5-5.15-41CD52?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-FCC624?logo=linux&logoColor=black)](#quick-start)
-[![License](https://img.shields.io/badge/License-TBD-lightgrey)](#license)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
@@ -97,25 +97,51 @@ sudo apt install sshpass
 ./main.py --check    # print resolved hosts/projects without opening a window
 ```
 
-Optional desktop integration:
+Optional desktop integration (portable install):
 
 ```bash
 ./install.sh               # application menu entry
 ./install.sh --autostart   # also start on login
 ```
 
+### Install from a package
+
+A `.deb` is built automatically for every tagged release — grab it from
+[Releases](https://github.com/macitry/SCPro/releases), then:
+
+```bash
+sudo apt install ./scpro_2.0.0_all.deb
+scpro
+```
+
+The package installs the program to `/usr/share/scpro` and keeps per-user data in
+`~/.config/scpro`, `~/.local/state/scpro` and `~/.cache/scpro`.
+See [docs/PACKAGING.md](docs/PACKAGING.md) for building packages and the PPA workflow.
+
 ### First run
 
-Real configuration is **never** committed. On first launch, `deploy/*.example.*` is copied
-to the matching local files, which are listed in `.gitignore`:
+Real configuration is **never** committed. On first launch the bundled
+`*.example.*` templates are copied into the active configuration directory
+(`deploy/` in portable mode, `~/.config/scpro` when installed), and those copies
+are listed in `.gitignore`:
 
-| Local file | Template | Purpose |
+| Config file | Template | Purpose |
 | --- | --- | --- |
-| `deploy/projects.yaml` | `projects.example.yaml` | Projects, host rules, exclude profiles |
-| `deploy/deploy_config.yaml` | `deploy_config.example.yaml` | Current host, directory suffix, `workspace_root` |
-| `deploy/deploy_secrets.yaml` | `deploy_secrets.example.yaml` | SSH passwords (created with mode `600`) |
-| `deploy/ssh_config` | `ssh_config.example` | Mirror / fallback of `~/.ssh/config` |
-| `deploy/robot_connections.yaml` | `robot_connections.example.yaml` | Legacy password-key mapping (optional) |
+| `projects.yaml` | `projects.example.yaml` | Projects, host rules, exclude profiles |
+| `deploy_config.yaml` | `deploy_config.example.yaml` | Current host, directory suffix, `workspace_root` |
+| `deploy_secrets.yaml` | `deploy_secrets.example.yaml` | SSH passwords (created with mode `600`) |
+| `ssh_config` | `ssh_config.example` | Mirror / fallback of `~/.ssh/config` |
+| `robot_connections.yaml` | `robot_connections.example.yaml` | Legacy password-key mapping (optional) |
+
+### Where files live
+
+| Mode | Selected when | Configuration | Logs | Cache |
+| --- | --- | --- | --- | --- |
+| Portable | the program directory is writable (git clone, copied folder) | `deploy/` | `logs/` | `upload_tmp/` and `web/assets/` |
+| Installed | the program directory is read-only (deb package) | `~/.config/scpro` | `~/.local/state/scpro/logs` | `~/.cache/scpro` |
+
+`XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` are honoured;
+`SCPRO_PORTABLE=0` or `1` forces a mode.
 
 ## Configuration
 
@@ -185,9 +211,11 @@ SCPro/
 ├── backend.py               # adapter between UI and deploy core
 ├── deploy_core.py           # config, hosts, projects, secrets (no Qt)
 ├── vscode_theme.py          # reads VS Code theme/icons into web/assets
-├── install.sh               # desktop entry / autostart
+├── install.sh               # desktop entry / autostart (portable)
 ├── scpro.svg                # app and tray icon
-├── docs/                    # screenshots and social card
+├── LICENSE                  # MIT
+├── debian/                  # Debian/Ubuntu packaging (no debhelper needed)
+├── docs/                    # screenshots, social card, packaging guide
 ├── deploy/
 │   ├── deploy_one.sh        # deployment engine
 │   ├── name_suffix.sh       # shared suffix rules
@@ -215,11 +243,14 @@ SCPro/
 - There is no build step: edit `web/*` and restart the app.
 - JS → Python uses the `scpro://` navigation scheme; Python → JS uses `runJavaScript`.
   No QWebChannel, no bundler, no Node toolchain.
+- Build a Debian package locally with `dpkg-buildpackage -b -us -uc -d`
+  (the rules do not require debhelper).
 
 ## License
 
-No license has been added yet. Until a `LICENSE` file is present, the code is
-“all rights reserved”. If you plan to open-source it, MIT or Apache-2.0 is a good fit.
+[MIT](LICENSE) © 2026 macitry.
 
-Third-party assets: the codicon font and icons come from Visual Studio Code (MIT);
-file/folder icons are copied from the VS Code icon theme installed on the machine.
+Third-party assets: the codicon font and stylesheet come from Visual Studio Code (MIT)
+and are documented in `debian/copyright`. The folder/file icons are **not** distributed
+— they are generated at runtime from the VS Code icon theme installed on the user's
+machine.

@@ -21,13 +21,46 @@ from typing import Dict, List, Optional
 import yaml
 
 APP_ROOT = Path(__file__).resolve().parent
-DEPLOY_DIR = APP_ROOT / "deploy"
-UPLOAD_DIR = APP_ROOT / "upload_tmp"
-CONFIG_YAML = DEPLOY_DIR / "deploy_config.yaml"
-CONNECTIONS_YAML = DEPLOY_DIR / "robot_connections.yaml"
-SSH_CONFIG = DEPLOY_DIR / "ssh_config"
-SECRETS_YAML = DEPLOY_DIR / "deploy_secrets.yaml"
-PROJECTS_YAML = DEPLOY_DIR / "projects.yaml"
+DEPLOY_DIR = APP_ROOT / "deploy"          # 引擎与配置模板（安装后只读）
+TEMPLATE_DIR = DEPLOY_DIR
+
+
+def _env_path(name: str, default: str) -> Path:
+    return Path(os.environ.get(name) or default).expanduser()
+
+
+def _is_portable() -> bool:
+    """程序目录可写就用便携模式（配置放在程序目录内），否则用 XDG 目录。
+
+    安装到 /usr/share 后普通用户不可写，自动落到 ~/.config/scpro 等位置。
+    可用 SCPRO_PORTABLE=0/1 强制指定。
+    """
+    flag = os.environ.get("SCPRO_PORTABLE", "").strip().lower()
+    if flag in ("0", "false", "no"):
+        return False
+    if flag in ("1", "true", "yes"):
+        return True
+    return os.access(APP_ROOT, os.W_OK)
+
+
+PORTABLE = _is_portable()
+
+# 可写目录：配置 / 状态 / 缓存
+CONFIG_DIR = DEPLOY_DIR if PORTABLE else _env_path("XDG_CONFIG_HOME", "~/.config") / "scpro"
+STATE_DIR = (APP_ROOT / "logs") if PORTABLE else (
+    _env_path("XDG_STATE_HOME", "~/.local/state") / "scpro" / "logs")
+CACHE_DIR = (APP_ROOT / "upload_tmp") if PORTABLE else (
+    _env_path("XDG_CACHE_HOME", "~/.cache") / "scpro")
+UPLOAD_DIR = (APP_ROOT / "upload_tmp") if PORTABLE else (CACHE_DIR / "upload_tmp")
+ASSET_DIR = (APP_ROOT / "web" / "assets") if PORTABLE else (CACHE_DIR / "assets")
+LOCK_FILE = (APP_ROOT / ".instance.lock") if PORTABLE else (CACHE_DIR / "instance.lock")
+
+CONFIG_YAML = CONFIG_DIR / "deploy_config.yaml"
+CONNECTIONS_YAML = CONFIG_DIR / "robot_connections.yaml"
+SSH_CONFIG = CONFIG_DIR / "ssh_config"
+SECRETS_YAML = CONFIG_DIR / "deploy_secrets.yaml"
+PROJECTS_YAML = CONFIG_DIR / "projects.yaml"
+SETTINGS_JSON = CONFIG_DIR / "settings.json"
 SSH_SOURCE_CONFIG = Path.home() / ".ssh" / "config"
 DEPLOY_ONE_SH = DEPLOY_DIR / "deploy_one.sh"
 
@@ -106,10 +139,10 @@ def ensure_local_configs() -> List[str]:
     返回本次实际创建的文件名列表；已存在的文件一律不动。
     """
     created: List[str] = []
-    DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     for name, example in LOCAL_CONFIG_FILES:
-        target = DEPLOY_DIR / name
-        source = DEPLOY_DIR / example
+        target = CONFIG_DIR / name
+        source = TEMPLATE_DIR / example
         if target.exists() or not source.exists():
             continue
         try:
@@ -136,7 +169,7 @@ def workspace_root() -> Path:
     if not raw:
         raw = str(load_yaml(CONFIG_YAML).get("workspace_root") or "").strip()
     if not raw:
-        return APP_ROOT.parent
+        return APP_ROOT.parent if PORTABLE else Path.home()
     if raw == "~":
         return Path.home()
     if raw.startswith("~/"):
@@ -547,7 +580,7 @@ def sync_hosts() -> dict:
       能同步回项目，随项目分发）；
     - ~/.ssh/config 不存在 -> 用项目自带副本初始化 ~/.ssh/config（权限 600）。
     """
-    DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     # 以“上次同步后的项目副本”为基线，才能算出本次新增/移除了哪些 Host
     old = set(load_hosts(SSH_CONFIG))
     if SSH_SOURCE_CONFIG.exists():

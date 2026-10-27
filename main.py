@@ -37,9 +37,9 @@ APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
 ICON_SVG = APP_DIR / "scpro.svg"
 VERSION = "2.0.0"
-APP_SETTINGS = APP_DIR / "settings.json"
+APP_SETTINGS = backend.core.SETTINGS_JSON
 AUTOSTART_FILE = Path.home() / ".config" / "autostart" / "scpro.desktop"
-LOG_DIR = APP_DIR / "logs"
+LOG_DIR = backend.core.STATE_DIR
 LOG_KEEP_FILES = 30
 MAX_TASK_OUTPUT = 1_000_000
 TASK_IDLE_TIMEOUT_MS = 10 * 60 * 1000
@@ -420,7 +420,12 @@ class Bridge:
         self.proc = QProcess(self.window_ref)
         self.proc.setWorkingDirectory(str(backend.APP_DIR))
         self.proc.setProcessChannelMode(QProcess.MergedChannels)
-        self.proc.setProcessEnvironment(QProcessEnvironment.systemEnvironment())
+        env = QProcessEnvironment.systemEnvironment()
+        # 让部署引擎与界面使用同一套配置/缓存目录（XDG 或便携模式）
+        env.insert("SCPRO_CONFIG_DIR", str(backend.core.CONFIG_DIR))
+        env.insert("SCPRO_UPLOAD_DIR", str(backend.core.UPLOAD_DIR))
+        env.insert("SCPRO_PORTABLE", "1" if backend.core.PORTABLE else "0")
+        self.proc.setProcessEnvironment(env)
         self.proc.readyReadStandardOutput.connect(self._read_output)
         self.proc.errorOccurred.connect(self._on_process_error)
         self.proc.finished.connect(self._on_finished)
@@ -1216,7 +1221,7 @@ class MainWindow(QMainWindow):
             self.bridge.push_state()
             self.bridge.log("[INFO] SCPro 已就绪")
             for name in getattr(self, "startup_configs", []):
-                self.bridge.log("[INFO] 首次运行，已从模板生成 deploy/%s" % name)
+                self.bridge.log("[INFO] 首次运行，已从模板生成 %s" % name)
 
     def _show_window(self) -> None:
         self.showNormal()
@@ -1391,7 +1396,7 @@ def main() -> int:
         ssh_source = backend.core.ssh_config_source()
         print("SSH 配置 : %s%s" % (
             ssh_source,
-            "" if ssh_source == backend.core.SSH_SOURCE_CONFIG else "（项目自带）"))
+            "" if ssh_source == backend.core.SSH_SOURCE_CONFIG else "（本地副本）"))
         if created_configs:
             print("本地配置 : 已由模板生成 %s" % ", ".join(created_configs))
         for project in state.get("projects", []):
@@ -1404,7 +1409,8 @@ def main() -> int:
         return 0
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
-    lock_path = APP_DIR / ".instance.lock"
+    lock_path = backend.core.LOCK_FILE
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     _INSTANCE_LOCK = open(lock_path, "w")
     try:
         fcntl.flock(_INSTANCE_LOCK, fcntl.LOCK_EX | fcntl.LOCK_NB)

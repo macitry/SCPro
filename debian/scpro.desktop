@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SCPro
+GenericName=Robot Deployment Console
+Comment=Deploy robot software over SSH with rsync
+Exec=scpro
+Icon=scpro
+Terminal=false
+Categories=Development;Utility;
+Keywords=deploy;rsync;ssh;robot;ros2;
+StartupNotify=true
