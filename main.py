@@ -96,6 +96,14 @@ def prune_old_logs(keep: int = LOG_KEEP_FILES) -> None:
         pass
 
 
+def default_targets() -> list:
+    """新项目的默认 Host 规则：沿用第一个已配置项目的规则。"""
+    for action in backend.core.load_projects():
+        if action.targets:
+            return [dict(rule) for rule in action.targets]
+    return [{"match": "*", "base": "/home/robot", "subdir": "."}]
+
+
 def title_style(colors: dict) -> str:
     """标题栏跟着 VS Code 主题走（Qt 不支持 #RRGGBBAA，hover 用 6 位色）"""
     return """
@@ -701,10 +709,7 @@ class Bridge:
             "name": "",
             "local_src": "",
             "remote_name": "",
-            "targets": [
-                {"match": "*-mc", "base": "/home/robot/workspace", "subdir": "."},
-                {"match": "*-ai", "base": "/home/robot/workspace", "subdir": "."},
-            ],
+            "targets": default_targets(),
             "template": "ros2_pkg" if "ros2_pkg" in profiles else next(iter(profiles), ""),
             "patterns": [],
             "profiles": list(profiles),
@@ -731,9 +736,14 @@ class Bridge:
             })
         elif not result["patterns"]:
             result["patterns"] = [str(x) for x in (profiles.get(result["template"]) or [])]
+        if result["local_src"]:
+            entries, error = self._read_dir(result["local_src"])
+            result["tree"] = {
+                "path": result["local_src"], "entries": entries, "error": error,
+            }
         self._js("window.scproProjectData", result)
 
-    def _list_dir(self, path: str) -> None:
+    def _read_dir(self, path: str):
         root = backend.core.resolve_local_src(path)
         entries = []
         error = ""
@@ -750,6 +760,10 @@ class Bridge:
         except OSError as exc:
             error = "读取目录失败: %s" % exc
             self.log("[ERROR] %s（%s）" % (error, root))
+        return entries, error
+
+    def _list_dir(self, path: str) -> None:
+        entries, error = self._read_dir(path)
         self._js("window.scproDirEntries",
                  {"path": path, "entries": entries, "error": error})
 
@@ -758,7 +772,11 @@ class Bridge:
         start = backend.core.resolve_local_src(current) or str(backend.core.workspace_root())
         chosen = QFileDialog.getExistingDirectory(self.window_ref, "选择本地源码目录", start)
         path = backend.core.compact_local_src(chosen) if chosen else ""
-        self._js("window.scproDirChosen", {"path": path})
+        payload = {"path": path}
+        if path:
+            entries, error = self._read_dir(path)
+            payload["tree"] = {"path": path, "entries": entries, "error": error}
+        self._js("window.scproDirChosen", payload)
 
     def _save_project(self, payload: dict) -> None:
         core = backend.core

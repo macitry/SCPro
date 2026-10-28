@@ -755,7 +755,12 @@ window.scproDirChosen = function (payload) {
   input.value = payload.path;
   editor.currentSrc = payload.path;
   editor.tree = {children: {}, expanded: new Set(), errors: {}};
-  requestDir(editor.currentSrc);
+  if (payload.tree && payload.tree.path === payload.path) {
+    editor.tree.children[payload.path] = payload.tree.entries || [];
+    if (payload.tree.error) editor.tree.errors[payload.path] = payload.tree.error;
+  } else {
+    requestDir(editor.currentSrc);
+  }
   renderTree();
 };
 
@@ -900,8 +905,14 @@ window.scproProjectData = function (data) {
 
   updateTemplateButton();
 
+  if (data.tree && data.tree.path === editor.currentSrc) {
+    editor.tree.children[data.tree.path] = data.tree.entries || [];
+    if (data.tree.error) editor.tree.errors[data.tree.path] = data.tree.error;
+  }
   document.getElementById("editor").classList.remove("hidden");
-  if (editor.currentSrc) requestDir(editor.currentSrc);
+  if (editor.currentSrc && !(editor.currentSrc in editor.tree.children)) {
+    requestDir(editor.currentSrc);
+  }
   renderTree();
 };
 
