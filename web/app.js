@@ -213,6 +213,7 @@ function applyLanguage(lang) {
       t(panel.style.display === "none" ? "panel.show" : "panel.hide");
   }
   document.title = t("app.title");
+  if (editor && document.getElementById("ed-profile-btn")) updateTemplateButton();
   render();
   updateRunButton();
 }
@@ -686,7 +687,8 @@ const editor = {
   template: "",
   patterns: [],
   currentSrc: "",
-  tree: {children: {}, expanded: new Set()},
+  tree: {children: {}, expanded: new Set(), errors: {}},
+  templateMenu: null,
 };
 
 function patternToRegex(pattern) {
@@ -742,6 +744,8 @@ function requestDir(path) {
 
 window.scproDirEntries = function (payload) {
   editor.tree.children[payload.path] = payload.entries || [];
+  if (payload.error) editor.tree.errors[payload.path] = payload.error;
+  else delete editor.tree.errors[payload.path];
   renderTree();
 };
 
@@ -750,10 +754,36 @@ window.scproDirChosen = function (payload) {
   const input = document.getElementById("ed-src");
   input.value = payload.path;
   editor.currentSrc = payload.path;
-  editor.tree = {children: {}, expanded: new Set()};
+  editor.tree = {children: {}, expanded: new Set(), errors: {}};
   requestDir(editor.currentSrc);
   renderTree();
 };
+
+function templateLabel(value) {
+  return value || t("editor.no_template");
+}
+
+function updateTemplateButton() {
+  const button = document.getElementById("ed-profile-btn");
+  if (!button) return;
+  button.textContent = templateLabel(editor.template) + " ▾";
+  button.title = t("editor.excludes");
+  button.onclick = () => {
+    const items = [{label: t("editor.no_template"),
+                    action: () => applyTemplate("")}];
+    editor.profiles.forEach(name => {
+      items.push({label: name, action: () => applyTemplate(name)});
+    });
+    openContextMenu(button, items);
+  };
+}
+
+function applyTemplate(value) {
+  editor.template = value;
+  editor.patterns = (editor.profileItems[value] || []).slice();
+  updateTemplateButton();
+  renderTree();
+}
 
 function toggleExclude(name, checked) {
   if (checked) {
@@ -803,7 +833,11 @@ function renderTree() {
     box.appendChild(el("div", "tree-empty", t("editor.pick_src")));
     return;
   }
-  if (!(editor.currentSrc in editor.tree.children)) {
+  if (editor.tree.errors[editor.currentSrc]) {
+    box.appendChild(el("div", "tree-empty tree-error", editor.tree.errors[editor.currentSrc]));
+    return;
+  }
+  if (editor.tree.children[editor.currentSrc] == null) {
     box.appendChild(el("div", "tree-empty", t("editor.loading")));
     return;
   }
@@ -836,7 +870,9 @@ function renderLevel(box, base, depth, ancestorExcluded = false) {
     row.appendChild(el("span", "", entry.name + (entry.dir ? "/" : "")));
     box.appendChild(row);
     if (entry.dir && editor.tree.expanded.has(path)) {
-      if (!(path in editor.tree.children)) {
+      if (editor.tree.errors[path]) {
+        box.appendChild(el("div", "tree-empty tree-error", editor.tree.errors[path]));
+      } else if (editor.tree.children[path] == null) {
         box.appendChild(el("div", "tree-empty", t("editor.loading")));
         requestDir(path);
       } else {
@@ -853,7 +889,7 @@ window.scproProjectData = function (data) {
   editor.template = data.template || "";
   editor.patterns = (data.patterns || []).slice();
   editor.currentSrc = data.local_src || "";
-  editor.tree = {children: {}, expanded: new Set()};
+  editor.tree = {children: {}, expanded: new Set(), errors: {}};
 
   document.getElementById("ed-title").textContent =
     t(data.editing ? "editor.edit" : "editor.new");
@@ -862,24 +898,7 @@ window.scproProjectData = function (data) {
   document.getElementById("ed-remote").value = data.remote_name || "";
   renderRules(data.targets || []);
 
-  const select = document.getElementById("ed-profile");
-  select.innerHTML = "";
-  const none = document.createElement("option");
-  none.value = "";
-  none.textContent = t("editor.no_template");
-  select.appendChild(none);
-  editor.profiles.forEach(name => {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    select.appendChild(option);
-  });
-  select.value = editor.template;
-  select.onchange = () => {
-    editor.template = select.value;
-    editor.patterns = (editor.profileItems[editor.template] || []).slice();
-    renderTree();
-  };
+  updateTemplateButton();
 
   document.getElementById("editor").classList.remove("hidden");
   if (editor.currentSrc) requestDir(editor.currentSrc);
@@ -1088,7 +1107,7 @@ function bind() {
     renderRules([...collectRules(), {match: "", base: "", subdir: "."}]);
   document.getElementById("ed-src").onchange = () => {
     editor.currentSrc = document.getElementById("ed-src").value.trim();
-    editor.tree = {children: {}, expanded: new Set()};
+    editor.tree = {children: {}, expanded: new Set(), errors: {}};
     requestDir(editor.currentSrc);
     renderTree();
     updatePreview();

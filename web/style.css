@@ -343,6 +343,10 @@ input:focus, select:focus { border-color: var(--accent); }
   margin: 12px 0 6px; font-size: 11.5px; color: var(--muted);
 }
 .section-head select { height: 24px; }
+#ed-profile-btn {
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tree-error { color: var(--danger); white-space: pre-wrap; }
 .rules { width: 100%; border-collapse: collapse; font-size: 12px; }
 .rules th {
   text-align: left; font-weight: normal; color: var(--muted);

@@ -736,6 +736,7 @@ class Bridge:
     def _list_dir(self, path: str) -> None:
         root = backend.core.resolve_local_src(path)
         entries = []
+        error = ""
         try:
             items = sorted(os.scandir(root),
                            key=lambda e: (not e.is_dir(follow_symlinks=False), e.name.lower()))
@@ -747,8 +748,10 @@ class Bridge:
                     size = 0
                 entries.append({"name": entry.name, "dir": is_dir, "size": size})
         except OSError as exc:
-            self._js("window.scproToast", "读取目录失败: %s" % exc)
-        self._js("window.scproDirEntries", {"path": path, "entries": entries})
+            error = "读取目录失败: %s" % exc
+            self.log("[ERROR] %s（%s）" % (error, root))
+        self._js("window.scproDirEntries",
+                 {"path": path, "entries": entries, "error": error})
 
     def _choose_dir(self, current: str) -> None:
         from PyQt5.QtWidgets import QFileDialog

@@ -60,7 +60,7 @@ CONNECTIONS_YAML = CONFIG_DIR / "robot_connections.yaml"
 SSH_CONFIG = CONFIG_DIR / "ssh_config"
 SECRETS_YAML = CONFIG_DIR / "deploy_secrets.yaml"
 PROJECTS_YAML = CONFIG_DIR / "projects.yaml"
-SETTINGS_JSON = CONFIG_DIR / "settings.json"
+SETTINGS_JSON = (APP_ROOT / "settings.json") if PORTABLE else (CONFIG_DIR / "settings.json")
 SSH_SOURCE_CONFIG = Path.home() / ".ssh" / "config"
 DEPLOY_ONE_SH = DEPLOY_DIR / "deploy_one.sh"
 
