@@ -36,7 +36,7 @@ import vscode_theme
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
 ICON_SVG = APP_DIR / "scpro.svg"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 APP_SETTINGS = backend.core.SETTINGS_JSON
 AUTOSTART_FILE = Path.home() / ".config" / "autostart" / "scpro.desktop"
 LOG_DIR = backend.core.STATE_DIR
@@ -304,6 +304,10 @@ class Bridge:
             self._hosts_data()
         elif command == "save-hosts":
             self._save_hosts(payload)
+        elif command == "add-host":
+            self._add_host(payload)
+        elif command == "delete-host":
+            self._delete_host(str(payload.get("alias", "")))
         elif command == "copy-project":
             self._copy_project(str(payload.get("name", "")))
         elif command == "delete-project":
@@ -916,6 +920,55 @@ class Bridge:
         self._js("window.scproHostsSaved", {"ok": True})
         self.log("[INFO] 已更新 Host 设置（忽略 %d 条，端口覆盖 %d 条）"
                  % (len(ignore), len(ports)))
+        self.push_state()
+
+    def _add_host(self, payload: dict) -> None:
+        if self.proc is not None:
+            self._js("window.scproHostAddResult",
+                     {"ok": False, "error": "任务执行中，暂不能添加 Host"})
+            return
+        alias = str(payload.get("alias", "")).strip()
+        try:
+            backend.add_host(alias, str(payload.get("host", "")),
+                             str(payload.get("user", "")),
+                             str(payload.get("port", "22")))
+        except Exception as exc:
+            self._js("window.scproHostAddResult", {"ok": False, "error": str(exc)})
+            return
+        try:
+            backend.core.sync_hosts()
+        except Exception as exc:
+            self.log("[WARN] 同步 ssh_config 副本失败: %s" % exc)
+        try:
+            backend.set_host(alias)
+        except Exception as exc:
+            self.log("[WARN] 切换当前 Host 失败: %s" % exc)
+        self.log("[INFO] 已添加 Host: %s" % alias)
+        self._js("window.scproHostAddResult", {"ok": True})
+        self.push_state()
+
+    def _delete_host(self, alias: str) -> None:
+        if self.proc is not None:
+            self._js("window.scproHostDeleted",
+                     {"ok": False, "error": "任务执行中，暂不能删除 Host"})
+            return
+        try:
+            backend.delete_host(alias)
+        except Exception as exc:
+            self._js("window.scproHostDeleted", {"ok": False, "error": str(exc)})
+            return
+        try:
+            backend.core.sync_hosts()
+        except Exception as exc:
+            self.log("[WARN] 同步 ssh_config 副本失败: %s" % exc)
+        if backend.core.read_current_host() == alias:
+            remaining = [h["alias"] for h in backend.snapshot().get("hosts", [])]
+            try:
+                backend.set_host(remaining[0] if remaining else "")
+            except Exception:
+                pass
+        self.log("[INFO] 已删除 Host: %s" % alias)
+        self._js("window.scproHostDeleted", {"ok": True})
         self.push_state()
 
     def _copy_project(self, name: str) -> None:

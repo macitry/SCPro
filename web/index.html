@@ -29,6 +29,7 @@
       <div class="side-head">
         <span data-i18n="hosts.header">HOSTS</span>
         <span>
+          <button id="btn-add-host" class="icon" data-i18n-title="host.add" title="添加 Host">＋</button>
           <button id="btn-host-settings" class="icon" data-i18n-title="hosts.settings" title="Host 设置">⚙</button>
           <button id="btn-refresh" class="icon" data-i18n-title="hosts.refresh" title="从 ~/.ssh/config 刷新">⟳</button>
         </span>
@@ -204,6 +205,26 @@
         <div class="flex1"></div>
         <button id="host-cancel" class="btn" data-i18n="btn.cancel">取消</button>
         <button id="host-save" class="btn primary" data-i18n="btn.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="host-add" class="overlay hidden">
+    <div class="modal add-host-modal">
+      <div class="modal-title" data-i18n="host.add_title">添加 Host</div>
+      <div class="form-grid">
+        <label for="ha-alias" data-i18n="host.alias">别名</label>
+        <input id="ha-alias" autocomplete="off" spellcheck="false" data-i18n-placeholder="host.alias_ph" placeholder="例如 robot-01">
+        <label for="ha-host" data-i18n="host.hostname">地址</label>
+        <input id="ha-host" autocomplete="off" spellcheck="false" data-i18n-placeholder="host.hostname_ph" placeholder="IP 或主机名">
+        <label for="ha-user" data-i18n="host.user">用户</label>
+        <input id="ha-user" autocomplete="off" spellcheck="false" value="robot">
+        <label for="ha-port" data-i18n="host.port">端口</label>
+        <input id="ha-port" type="number" min="1" max="65535" value="22">
+      </div>
+      <div class="modal-actions">
+        <button id="ha-cancel" class="btn" data-i18n="btn.cancel">取消</button>
+        <button id="ha-save" class="btn primary" data-i18n="btn.save">保存</button>
       </div>
     </div>
   </div>

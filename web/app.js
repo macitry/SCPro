@@ -30,6 +30,15 @@ const I18N = {
     "host.no_host": "没有可用 Host",
     "host.status_online": "在线", "host.status_offline": "离线",
     "host.status_unknown": "未测试",
+    "host.add": "添加 Host", "host.add_title": "添加 Host",
+    "host.alias": "别名", "host.alias_ph": "例如 robot-01",
+    "host.hostname": "地址", "host.hostname_ph": "IP 或主机名",
+    "host.user": "用户", "host.port": "端口",
+    "host.delete": "删除 Host",
+    "host.delete_title": "删除 Host",
+    "host.delete_body": "确定从 SSH 配置中删除 %s 吗？\n会先备份为 .bak。",
+    "host.add_ok": "Host 已添加", "host.delete_ok": "Host 已删除",
+    "host.required": "别名、地址、用户都不能为空",
     "row.no_rule": "— 该 Host 无对应规则",
     "act.edit": "编辑…",
     "act.copy": "复制项目", "act.delete": "删除项目",
@@ -105,6 +114,15 @@ const I18N = {
     "host.no_host": "no Host available",
     "host.status_online": "online", "host.status_offline": "offline",
     "host.status_unknown": "unknown",
+    "host.add": "Add host", "host.add_title": "Add host",
+    "host.alias": "Alias", "host.alias_ph": "e.g. robot-01",
+    "host.hostname": "Hostname", "host.hostname_ph": "IP or hostname",
+    "host.user": "User", "host.port": "Port",
+    "host.delete": "Delete host",
+    "host.delete_title": "Delete host",
+    "host.delete_body": "Remove %s from the SSH config?\nA .bak backup will be created.",
+    "host.add_ok": "Host added", "host.delete_ok": "Host deleted",
+    "host.required": "Alias, hostname and user are required",
     "row.no_rule": "— no rule for this Host",
     "act.edit": "Edit…",
     "act.copy": "Duplicate project", "act.delete": "Delete project",
@@ -262,6 +280,38 @@ window.scproHostKey = function (payload) {
     t("warn.hostkey", payload.alias, payload.fingerprint || t("hostkey.unknown")),
     () => send("update-host-key", {alias: payload.alias}), t("confirm.accept_key"));
 };
+
+function openAddHost() {
+  if (state.running) {
+    window.scproToast(t("toast.host_locked"));
+    return;
+  }
+  document.getElementById("ha-alias").value = "";
+  document.getElementById("ha-host").value = "";
+  document.getElementById("ha-user").value = "robot";
+  document.getElementById("ha-port").value = "22";
+  document.getElementById("host-add").classList.remove("hidden");
+  setTimeout(() => document.getElementById("ha-alias").focus(), 0);
+}
+
+function closeAddHost() {
+  document.getElementById("host-add").classList.add("hidden");
+}
+
+function submitAddHost() {
+  const value = id => document.getElementById(id).value.trim();
+  const payload = {
+    alias: value("ha-alias"),
+    host: value("ha-host"),
+    user: value("ha-user"),
+    port: value("ha-port") || "22",
+  };
+  if (!payload.alias || !payload.host || !payload.user) {
+    window.scproToast(t("host.required"));
+    return;
+  }
+  send("add-host", payload);
+}
 
 function showConfirm(title, body, onOk, okText = t("btn.ok")) {
   const overlay = document.getElementById("overlay");
@@ -424,6 +474,14 @@ function render() {
     row.appendChild(el("span", "dot " + status));
     row.appendChild(el("span", "name", h.alias));
     row.appendChild(el("span", "meta", h.port));
+    const remove = el("button", "host-del", "×");
+    remove.title = t("host.delete");
+    remove.onclick = (event) => {
+      event.stopPropagation();
+      showConfirm(t("host.delete_title"), t("host.delete_body", h.alias),
+                  () => send("delete-host", {alias: h.alias}), t("host.delete"));
+    };
+    row.appendChild(remove);
     row.onclick = () => {
       if (state.running) {
         window.scproToast(t("toast.host_locked"));
@@ -924,6 +982,20 @@ window.scproHostsData = function (payload) {
   document.getElementById("hosts").classList.remove("hidden");
 };
 
+window.scproHostAddResult = function (payload) {
+  if (payload.ok) {
+    closeAddHost();
+    window.scproToast(t("host.add_ok"));
+  } else {
+    window.scproToast(payload.error || t("toast.save_failed"));
+  }
+};
+
+window.scproHostDeleted = function (payload) {
+  window.scproToast(payload.ok ? t("host.delete_ok")
+                               : (payload.error || t("toast.save_failed")));
+};
+
 window.scproHostsSaved = function (payload) {
   if (payload.ok) {
     document.getElementById("hosts").classList.add("hidden");
@@ -1050,6 +1122,14 @@ function bind() {
   document.getElementById("set-clear-cache").onclick = () => showConfirm(
     t("confirm.clear_cache"), t("confirm.clear_cache_body"),
     () => send("clear-cache"), t("confirm.clear_cache"));
+  document.getElementById("btn-add-host").onclick = openAddHost;
+  document.getElementById("ha-cancel").onclick = closeAddHost;
+  document.getElementById("ha-save").onclick = submitAddHost;
+  ["ha-alias", "ha-host", "ha-user", "ha-port"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", event => {
+      if (event.key === "Enter") submitAddHost();
+    });
+  });
   document.getElementById("btn-host-settings").onclick = () => send("hosts-data");
   document.getElementById("btn-passwords").onclick = () => {
     document.getElementById("hosts").classList.add("hidden");
@@ -1127,6 +1207,11 @@ function bind() {
       document.getElementById("btn-run").click();
     } else if (e.key === "Escape") {
       closeContextMenu();
+      const addHost = document.getElementById("host-add");
+      if (addHost && !addHost.classList.contains("hidden")) {
+        closeAddHost();
+        return;
+      }
       if (!document.getElementById("overlay").classList.contains("hidden")) {
         document.getElementById("modal-cancel").click();
       }

@@ -1,3 +1,9 @@
+scpro (2.1.0) jammy; urgency=medium
+
+  * Add host creation and deletion from the sidebar.
+
+ -- macitry <macitry@users.noreply.github.com>  Wed, 28 Oct 2026 12:10:00 +0800
+
 scpro (2.0.0) jammy; urgency=medium
 
   * Initial release.

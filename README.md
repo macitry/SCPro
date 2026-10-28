@@ -50,6 +50,8 @@ ritual for every board. SCPro turns that into: **pick a host, tick projects, upl
 
 - Host list synced from `~/.ssh/config`, with ignore patterns, port overrides and live
   online/offline status
+- Add or remove hosts from the sidebar; changes go to `~/.ssh/config` with a `.bak`
+  backup and are mirrored to the project copy
 - Wildcard target rules per project, with a hit preview in the editor
 - HTML project editor: local source picker, remote directory name, ordered host rules,
   exclude profiles and a lazily expanded exclusion tree
@@ -110,7 +112,7 @@ A `.deb` is built automatically for every tagged release — grab it from
 [Releases](https://github.com/macitry/SCPro/releases), then:
 
 ```bash
-sudo apt install ./scpro_2.0.0_all.deb
+sudo apt install ./scpro_2.1.0_all.deb
 scpro
 ```
 

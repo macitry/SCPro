@@ -14,7 +14,7 @@ ls ../scpro_*.deb
 安装与卸载：
 
 ```bash
-sudo apt install ./scpro_2.0.0_all.deb
+sudo apt install ./scpro_2.1.0_all.deb
 scpro
 sudo apt remove scpro        # 不会删除 ~/.config/scpro 等用户数据
 ```
@@ -37,8 +37,8 @@ sudo apt remove scpro        # 不会删除 ~/.config/scpro 等用户数据
 打一个 `v*` tag 即可，`.github/workflows/deb.yml` 会构建 `.deb` 并附到 Release：
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
 ## 发布到 Ubuntu PPA
@@ -63,16 +63,16 @@ PPA 是 Ubuntu 的个人软件源，适合“任意 Ubuntu 用户一条命令安
 ### 创建 PPA 并上传
 
 1. 打开 https://launchpad.net/~<你的用户名>/+activate-ppa 创建 PPA（示例名 `scpro`）；
-2. **在名为 `scpro-2.0.0` 的干净目录里**构建源码包（Launchpad 要求 tar 顶层目录名匹配）：
+2. **在名为 `scpro-2.1.0` 的干净目录里**构建源码包（Launchpad 要求 tar 顶层目录名匹配）：
    ```bash
-   git clone https://github.com/macitry/SCPro.git /tmp/scpro-2.0.0
-   cd /tmp/scpro-2.0.0
+   git clone https://github.com/macitry/SCPro.git /tmp/scpro-2.1.0
+   cd /tmp/scpro-2.1.0
    debuild -S -k<KEY_ID>
    ```
    native 格式不需要额外的 orig tarball；`debian/source/options` 已排除本地配置、日志和缓存。
 3. 上传：
    ```bash
-   dput ppa:<你的用户名>/scpro ../scpro_2.0.0_source.changes
+   dput ppa:<你的用户名>/scpro ../scpro_2.1.0_source.changes
    ```
 4. 在 Launchpad 页面等待构建完成（通常几分钟）。
 

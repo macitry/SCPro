@@ -44,6 +44,7 @@ SCPro 把它变成：**选 Host、勾项目、上传**。
 **Host 与项目**
 
 - Host 列表从 `~/.ssh/config` 同步，支持忽略名单、端口覆盖、在线/离线状态
+- 侧栏可直接新增 / 删除 Host，改动写入 `~/.ssh/config`（自动备份 `.bak`）并同步项目副本
 - 每个项目可配多条通配规则，编辑器里实时预览命中结果
 - HTML 项目编辑器：选择源码目录、远端目录名、按顺序排列的 Host 规则、
   排除模板与按需展开的排除文件树
@@ -103,7 +104,7 @@ sudo apt install sshpass
 [Releases](https://github.com/macitry/SCPro/releases) 下载后：
 
 ```bash
-sudo apt install ./scpro_2.0.0_all.deb
+sudo apt install ./scpro_2.1.0_all.deb
 scpro
 ```
 

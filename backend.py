@@ -96,3 +96,11 @@ def write_hosts_config(ignore: list, ports: dict) -> None:
 
 def delete_project(name: str) -> None:
     core.delete_project(name)
+
+
+def add_host(alias: str, host: str, user: str, port: str) -> None:
+    core.add_host(alias, host, user, port)
+
+
+def delete_host(alias: str) -> None:
+    core.delete_host(alias)

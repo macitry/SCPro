@@ -610,6 +610,132 @@ def sync_hosts() -> dict:
 
 
 # ==========================================================================
+# Host 增删（直接改 ~/.ssh/config，改动前备份）
+# ==========================================================================
+_ALIAS_BAD_CHARS = set("*?!#")
+
+
+def _alias_in_config(text: str, alias: str) -> bool:
+    for line in text.splitlines():
+        entry = line.strip()
+        if entry.lower().startswith("host "):
+            if alias in entry.split()[1:]:
+                return True
+    return False
+
+
+def _ssh_edit_target() -> Path:
+    """增删操作的目标文件：系统配置优先，缺失时改项目内的副本。"""
+    return SSH_SOURCE_CONFIG if SSH_SOURCE_CONFIG.exists() else SSH_CONFIG
+
+
+def _check_alias(alias: str) -> str:
+    alias = (alias or "").strip()
+    if not alias:
+        raise ConfigError("别名不能为空")
+    if any(ch.isspace() for ch in alias) or any(ch in alias for ch in _ALIAS_BAD_CHARS):
+        raise ConfigError("别名不能包含空格或 * ? ! #")
+    if alias.startswith("-"):
+        raise ConfigError("别名不能以 - 开头")
+    return alias
+
+
+def add_host(alias: str, hostname: str, user: str, port="22") -> None:
+    """在 ~/.ssh/config 末尾追加一个 Host，首次创建时沿用现有配置内容。"""
+    alias = _check_alias(alias)
+    hostname = (hostname or "").strip()
+    user = (user or "").strip()
+    port = str(port or "22").strip() or "22"
+    if not hostname or any(ch.isspace() for ch in hostname):
+        raise ConfigError("地址不能为空，且不能包含空格")
+    if not user or any(ch.isspace() for ch in user):
+        raise ConfigError("用户不能为空，且不能包含空格")
+    try:
+        port_no = int(port)
+    except ValueError:
+        raise ConfigError("端口必须是数字")
+    if not 1 <= port_no <= 65535:
+        raise ConfigError("端口必须在 1-65535 之间")
+
+    created = not SSH_SOURCE_CONFIG.exists()
+    if created:
+        base = SSH_CONFIG.read_text(encoding="utf-8") if SSH_CONFIG.exists() else ""
+    else:
+        base = SSH_SOURCE_CONFIG.read_text(encoding="utf-8")
+    if _alias_in_config(base, alias):
+        raise ConfigError("Host 已存在: %s" % alias)
+
+    block = "\n".join([
+        "# Added by SCPro",
+        "Host %s" % alias,
+        "  HostName %s" % hostname,
+        "  User %s" % user,
+        "  Port %d" % port_no,
+    ])
+    new_text = ((base.rstrip("\n") + "\n\n" + block) if base.strip() else block) + "\n"
+    try:
+        SSH_SOURCE_CONFIG.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if created:
+            os.chmod(SSH_SOURCE_CONFIG.parent, 0o700)
+        _backup(SSH_SOURCE_CONFIG)
+        _atomic_write(SSH_SOURCE_CONFIG, new_text)
+        if created:
+            os.chmod(SSH_SOURCE_CONFIG, 0o600)
+    except OSError as exc:
+        raise ConfigError("写入 %s 失败: %s" % (SSH_SOURCE_CONFIG, exc))
+
+
+def delete_host(alias: str) -> None:
+    """从 ssh 配置里删除一个 Host（多别名行只去掉该别名）。"""
+    alias = (alias or "").strip()
+    if not alias:
+        raise ConfigError("Host 别名不能为空")
+    if any(ch in alias for ch in "*?!"):
+        raise ConfigError("通配 Host 不能在这里删除")
+
+    path = _ssh_edit_target()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ConfigError("读取 %s 失败: %s" % (path, exc))
+
+    start = end = None
+    tokens: List[str] = []
+    indent = ""
+    for index, line in enumerate(lines):
+        entry = line.strip()
+        if entry.lower().startswith("host "):
+            parts = entry.split()[1:]
+            if alias in parts:
+                start, tokens = index, parts
+                indent = line[:len(line) - len(line.lstrip())]
+                break
+    if start is None:
+        raise ConfigError("SSH 配置里没有这个 Host: %s" % alias)
+
+    for cursor in range(start + 1, len(lines)):
+        entry = lines[cursor].strip().lower()
+        if entry.startswith("host ") or entry.startswith("match "):
+            end = cursor
+            break
+    if end is None:
+        end = len(lines)
+
+    if len(tokens) > 1:
+        lines[start] = indent + "Host " + " ".join(t for t in tokens if t != alias)
+    else:
+        if end < len(lines) and not lines[end].strip():
+            end += 1
+        del lines[start:end]
+
+    try:
+        _backup(path)
+        _atomic_write(path, "\n".join(lines).rstrip("\n") + "\n")
+    except OSError as exc:
+        raise ConfigError("写入 %s 失败: %s" % (path, exc))
+
+
+# ==========================================================================
 # 密码
 # ==========================================================================
 def read_secrets() -> Dict[str, str]:
