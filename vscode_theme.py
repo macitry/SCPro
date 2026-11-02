@@ -394,10 +394,15 @@ def load(theme_id: str = "") -> dict:
               "disabledForeground"),
         _mix(text, bg, 0.35))
     muted = muted_preferred if _contrast(muted_preferred, bg) >= 3.0 else _mix(text, bg, 0.20)
-    danger = _readable(
-        bg,
-        _pick(raw, "errorForeground", "terminal.ansiRed"),
+    # danger 是语义色，不能像正文那样退化成黑/白；对比度不够时保留红色，
+    # 只做明暗方向上的微调。
+    danger = _solid(
+        _pick(raw, "terminal.ansiRed", "errorForeground"),
         defaults["danger"])
+    if _contrast(danger, bg) < 3.0:
+        danger = _solid(defaults["danger"], "#c62828")
+    if _contrast(danger, bg) < 3.0:
+        danger = _mix(danger, "#000000" if not dark else "#ffffff", 0.35)
 
     if ui_theme in ("hc-black", "hc-light"):
         hc_bg = "#000000" if ui_theme == "hc-black" else "#ffffff"
