@@ -314,10 +314,13 @@ function submitAddHost() {
   send("add-host", payload);
 }
 
-function showConfirm(title, body, onOk, okText = t("btn.ok")) {
+function showConfirm(title, body, onOk, okText = t("btn.ok"), warning = "") {
   const overlay = document.getElementById("overlay");
   document.getElementById("modal-title").textContent = title;
   document.getElementById("modal-body").textContent = body;
+  const warningBox = document.getElementById("modal-warning");
+  warningBox.textContent = warning;
+  warningBox.classList.toggle("hidden", !warning);
   document.getElementById("modal-ok").textContent = okText;
   overlay.classList.remove("hidden");
   const close = () => overlay.classList.add("hidden");
@@ -329,6 +332,7 @@ const logEntries = [];
 const MAX_LOG = 5000;
 
 function classifyLog(line) {
+  if (/远端清理[:：]\s*开启/.test(line)) return "danger";
   if (/\[(ERROR|失败)\]/.test(line)) return "error";
   if (/\[WARN\]/.test(line)) return "warn";
   if (/\[(OK|成功|完成)\]/.test(line)) return "ok";
@@ -339,15 +343,17 @@ function classifyLog(line) {
 }
 
 function logClass(level) {
-  return {error: "err", warn: "warn", ok: "ok", progress: "prog",
-          info: "info", cmd: "cmd", normal: ""}[level] || "";
+  return {error: "err", danger: "danger", warn: "warn", ok: "ok",
+          progress: "prog", info: "info", cmd: "cmd", normal: ""}[level] || "";
 }
 
 function logMatches(entry) {
   const query = document.getElementById("log-search").value.trim().toLowerCase();
   if (query && !entry.line.toLowerCase().includes(query)) return false;
   const level = document.getElementById("log-level").value;
-  if (level === "problem") return entry.level === "error" || entry.level === "warn";
+  if (level === "problem") {
+    return ["error", "warn", "danger"].includes(entry.level);
+  }
   if (level === "progress") return entry.level === "progress";
   if (level === "info") return entry.level === "info" || entry.level === "ok" || entry.level === "normal";
   return true;
@@ -957,6 +963,7 @@ window.scproSettingsData = function (payload) {
   document.getElementById("set-notify").checked = !!payload.notify;
   document.getElementById("set-autostart").checked = !!payload.autostart;
   document.getElementById("set-delete-remote").checked = !!payload.delete_remote;
+  updateDeleteRemoteLabel();
   document.getElementById("set-suffix").value = payload.suffix || "";
   document.getElementById("set-language").value = payload.language || state.lang || "zh";
   const themeSelect = document.getElementById("set-theme-select");
@@ -1043,14 +1050,20 @@ window.scproPreflight = function (result) {
   }
   const warn = (result.warnings || []).length
     ? t("msg.warning_prefix") + result.warnings.join("\n") : "";
-  const cleanup = "\n\n" + t(state.deleteRemote ? "msg.delete_on" : "msg.delete_off");
+  const cleanup = t(state.deleteRemote ? "msg.delete_on" : "msg.delete_off");
   showConfirm(t("confirm.upload"),
-    t("msg.upload_body", result.projects.length, state.currentHost) + cleanup + warn,
+    t("msg.upload_body", result.projects.length, state.currentHost) + warn,
     () => {
       send("run", {projects: result.projects});
       setLogPanel(true);
-    }, t("confirm.start"));
+    }, t("confirm.start"), cleanup);
 };
+
+function updateDeleteRemoteLabel() {
+  const input = document.getElementById("set-delete-remote");
+  const label = document.getElementById("set-delete-remote-label");
+  if (input && label) label.classList.toggle("danger-text", input.checked);
+}
 
 function saveEditor() {
   const base = editor.profileItems[editor.template] || [];
@@ -1152,6 +1165,7 @@ function bind() {
   document.getElementById("set-clear-cache").onclick = () => showConfirm(
     t("confirm.clear_cache"), t("confirm.clear_cache_body"),
     () => send("clear-cache"), t("confirm.clear_cache"));
+  document.getElementById("set-delete-remote").addEventListener("change", updateDeleteRemoteLabel);
   document.getElementById("btn-add-host").onclick = openAddHost;
   document.getElementById("ha-cancel").onclick = closeAddHost;
   document.getElementById("ha-save").onclick = submitAddHost;

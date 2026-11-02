@@ -107,6 +107,7 @@
     <div class="modal">
       <div class="modal-title" id="modal-title"></div>
       <div class="modal-body" id="modal-body"></div>
+      <div class="modal-warning hidden" id="modal-warning"></div>
       <div class="modal-actions">
         <button id="modal-cancel" class="btn" data-i18n="btn.cancel">取消</button>
         <button id="modal-ok" class="btn primary" data-i18n="btn.ok">确定</button>
@@ -166,7 +167,7 @@
       <div class="modal-title" data-i18n="settings.title">设置</div>
       <label class="check"><input id="set-notify" type="checkbox"> <span data-i18n="settings.notify">任务结束时弹托盘通知</span></label>
       <label class="check"><input id="set-autostart" type="checkbox"> <span data-i18n="settings.autostart">登录桌面后自动启动 SCPro</span></label>
-      <label class="check"><input id="set-delete-remote" type="checkbox"> <span data-i18n="settings.delete_remote">上传时删除远端多余文件（谨慎开启）</span></label>
+      <label class="check"><input id="set-delete-remote" type="checkbox"> <span id="set-delete-remote-label" data-i18n="settings.delete_remote">上传时删除远端多余文件（谨慎开启）</span></label>
       <div class="form-line">
         <label for="set-language" data-i18n="settings.language">语言</label>
         <select id="set-language">
