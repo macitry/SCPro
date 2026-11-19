@@ -144,7 +144,7 @@ A `.deb` is built automatically for every tagged release — grab it from
 [Releases](https://github.com/macitry/SCPro/releases), then:
 
 ```bash
-sudo apt install ./scpro_2.2.0_all.deb
+sudo apt install ./scpro_2.2.1_all.deb
 scpro
 ```
 

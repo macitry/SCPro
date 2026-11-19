@@ -127,7 +127,7 @@ sudo apt install sshpass
 [Releases](https://github.com/macitry/SCPro/releases) 下载后：
 
 ```bash
-sudo apt install ./scpro_2.2.0_all.deb
+sudo apt install ./scpro_2.2.1_all.deb
 scpro
 ```
 

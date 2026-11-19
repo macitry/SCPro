@@ -1,3 +1,9 @@
+scpro (2.2.1) jammy; urgency=medium
+
+  * Remember project selections per host when switching targets.
+
+ -- macitry <macitry@users.noreply.github.com>  Thu, 19 Nov 2026 11:20:00 +0800
+
 scpro (2.2.0) jammy; urgency=medium
 
   * Add a plugin host with activity-bar panels and a bundled memory monitor.
