@@ -84,6 +84,7 @@ const I18N = {
     "toast.saved": "已保存", "toast.settings_saved": "设置已保存",
     "toast.secrets_saved": "密码已保存", "toast.hosts_saved": "Host 设置已保存",
     "toast.host_locked": "任务执行中，暂不能切换 Host",
+    "toast.selection_dropped": "已取消 %d 个在当前 Host 下不可用的项目",
     "toast.save_failed": "保存失败",
     "btn.retry": "重试失败项",
     "summary.text": "成功 %d / 失败 %d / 已取消 %d",
@@ -168,6 +169,7 @@ const I18N = {
     "toast.saved": "Saved", "toast.settings_saved": "Settings saved",
     "toast.secrets_saved": "Passwords saved", "toast.hosts_saved": "Host settings saved",
     "toast.host_locked": "Cannot switch Host while a task is running",
+    "toast.selection_dropped": "Deselected %d project(s) unavailable on this host",
     "toast.save_failed": "Save failed",
     "btn.retry": "Retry failed",
     "summary.text": "%d ok / %d failed / %d cancelled",
@@ -236,8 +238,16 @@ window.scproState = function (payload) {
   state.hosts = payload.hosts || [];
   state.projects = payload.projects || [];
   state.currentHost = payload.current_host || "";
-  const ids = new Set(state.projects.map(p => p.id));
-  state.selected = new Set([...state.selected].filter(id => ids.has(id)));
+  const usable = new Set(state.projects
+    .filter(p => p.remote && !p.error)
+    .map(p => p.id));
+  const before = state.selected.size;
+  state.selected = new Set([...state.selected].filter(id => usable.has(id)));
+  const dropped = before - state.selected.size;
+  if (dropped > 0) {
+    window.scproToast(t("toast.selection_dropped", dropped));
+    send("save-ui", {panel_h: panelHeight, selected: [...state.selected]});
+  }
   render();
 };
 
@@ -523,7 +533,8 @@ function render() {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.checked = state.selected.has(p.id);
-    check.disabled = disabled;
+    // 已被选中的项目即使在当前 Host 下不可用，也允许取消勾选
+    check.disabled = disabled && !check.checked;
     check.onchange = () => {
       if (check.checked) state.selected.add(p.id); else state.selected.delete(p.id);
       updateRunButton();

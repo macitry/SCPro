@@ -381,7 +381,7 @@ class Bridge:
             return
         state = backend.snapshot()
         host = state.get("current_host", "")
-        allowed = {p["id"] for p in state.get("projects", []) if p.get("remote")}
+        allowed = {p["id"] for p in state.get("projects", []) if p.get("remote") and not p.get("error")}
         self.queue = [p for p in projects if p in allowed]
         if not self.queue:
             self.log("[WARN] 没有可上传的项目")
