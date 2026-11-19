@@ -19,6 +19,7 @@
       <button class="act" data-view="log" data-i18n-title="tab.log" title="输出">
         <span class="codicon codicon-terminal"></span>
       </button>
+      <div id="plugin-acts" class="plugin-acts"></div>
       <div class="flex1"></div>
       <button class="act" id="btn-settings" data-i18n-title="tab.settings" title="设置">
         <span class="codicon codicon-gear"></span>
@@ -102,6 +103,17 @@
     <span id="status-host"></span>
     <span id="status-progress"></span>
   </footer>
+
+  <section id="plugin-view" class="plugin-view hidden">
+    <div class="plugin-head">
+      <span class="codicon codicon-extensions" id="plugin-icon"></span>
+      <span class="plugin-title" id="plugin-title"></span>
+      <span class="plugin-version muted" id="plugin-version"></span>
+      <div class="flex1"></div>
+      <button id="plugin-close" class="icon" title="关闭">✕</button>
+    </div>
+    <iframe id="plugin-frame" class="plugin-frame" title="plugin"></iframe>
+  </section>
 
   <div id="overlay" class="overlay hidden">
     <div class="modal">

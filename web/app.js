@@ -169,7 +169,6 @@ const I18N = {
     "toast.saved": "Saved", "toast.settings_saved": "Settings saved",
     "toast.secrets_saved": "Passwords saved", "toast.hosts_saved": "Host settings saved",
     "toast.host_locked": "Cannot switch Host while a task is running",
-    "toast.selection_dropped": "Deselected %d project(s) unavailable on this host",
     "toast.save_failed": "Save failed",
     "btn.retry": "Retry failed",
     "summary.text": "%d ok / %d failed / %d cancelled",
@@ -218,6 +217,8 @@ function applyLanguage(lang) {
   if (editor && document.getElementById("ed-profile-btn")) updateTemplateButton();
   render();
   updateRunButton();
+  renderPluginActs();
+  pushPluginTheme();
 }
 
 function send(cmd, data) {
@@ -257,6 +258,9 @@ window.scproTheme = function (payload) {
   Object.entries(payload.colors || {}).forEach(([key, value]) => {
     root.style.setProperty("--" + key.replace(/_/g, "-"), value);
   });
+  pluginState.colors = payload.colors || {};
+  pluginState.dark = !!payload.dark;
+  pushPluginTheme();
 };
 
 window.scproAssets = function (assets) {
@@ -1262,6 +1266,10 @@ function bind() {
       document.getElementById("btn-run").click();
     } else if (e.key === "Escape") {
       closeContextMenu();
+      if (pluginState.open) {
+        closePlugin();
+        return;
+      }
       const addHost = document.getElementById("host-add");
       if (addHost && !addHost.classList.contains("hidden")) {
         closeAddHost();
@@ -1278,6 +1286,95 @@ function bind() {
     }
   });
 }
+
+/* ---------------- 插件（webview） ----------------
+   宿主侧只做三件事：建活动栏按钮、开 iframe、转发消息。
+   插件逻辑全在 Python + 插件自己的 panel.html 里，互不侵入。 */
+const pluginState = {list: [], open: "", colors: {}, dark: true};
+
+window.scproPlugins = function (list) {
+  pluginState.list = Array.isArray(list) ? list : [];
+  renderPluginActs();
+};
+
+function pluginLabel(plugin) {
+  return state.lang === "en" ? (plugin.name_en || plugin.name) : plugin.name;
+}
+
+function renderPluginActs() {
+  const box = document.getElementById("plugin-acts");
+  if (!box) return;
+  box.innerHTML = "";
+  pluginState.list.filter(plugin => !plugin.error).forEach(plugin => {
+    const button = el("button", "act" + (pluginState.open === plugin.id ? " active" : ""));
+    button.dataset.plugin = plugin.id;
+    button.title = pluginLabel(plugin) + (plugin.description ? " — " + plugin.description : "");
+    const icon = el("span", "codicon codicon-" + (plugin.icon || "extensions"));
+    button.appendChild(icon);
+    button.onclick = () => {
+      if (pluginState.open === plugin.id) closePlugin();
+      else openPlugin(plugin);
+    };
+    box.appendChild(button);
+  });
+}
+
+function openPlugin(plugin) {
+  if (!plugin || !plugin.url) return;
+  pluginState.open = plugin.id;
+  renderPluginActs();
+  document.getElementById("plugin-view").classList.remove("hidden");
+  document.getElementById("plugin-title").textContent = pluginLabel(plugin);
+  document.getElementById("plugin-version").textContent = plugin.version ? "v" + plugin.version : "";
+  document.getElementById("plugin-icon").className = "codicon codicon-" + (plugin.icon || "extensions");
+  const frame = document.getElementById("plugin-frame");
+  if (frame.dataset.url !== plugin.url) {
+    frame.dataset.url = plugin.url;
+    frame.onload = () => pushPluginTheme();
+    frame.src = plugin.url;
+  }
+  send("plugin/" + plugin.id + "/activate");
+  setTimeout(pushPluginTheme, 0);
+}
+
+function closePlugin() {
+  if (!pluginState.open) return;
+  send("plugin/" + pluginState.open + "/deactivate");
+  pluginState.open = "";
+  document.getElementById("plugin-view").classList.add("hidden");
+  renderPluginActs();
+}
+
+function pushPluginTheme() {
+  const frame = document.getElementById("plugin-frame");
+  if (!frame || !frame.contentWindow || !pluginState.open) return;
+  frame.contentWindow.postMessage({
+    __scpro_event: true,
+    event: "theme",
+    data: {colors: pluginState.colors, dark: pluginState.dark, lang: state.lang}
+  }, "*");
+}
+
+window.scproPluginEvent = function (payload) {
+  if (!payload || payload.plugin !== pluginState.open) return;
+  const frame = document.getElementById("plugin-frame");
+  if (!frame || !frame.contentWindow) return;
+  frame.contentWindow.postMessage({
+    __scpro_event: true,
+    event: payload.event,
+    data: payload.data
+  }, "*");
+};
+
+// 插件 iframe → 宿主 → Python
+window.addEventListener("message", event => {
+  const msg = event.data;
+  if (!msg || msg.__scpro !== true || !msg.action) return;
+  if (msg.plugin !== pluginState.open) return;
+  send("plugin/" + msg.plugin + "/" + msg.action, msg.data || {});
+});
+
+document.getElementById("plugin-close").onclick = () => closePlugin();
 
 bind();
 // 初始状态由 Qt 在 loadFinished 后统一推送。加载期间发起自定义协议导航

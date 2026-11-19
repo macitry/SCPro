@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内存监控</title>
+<style>
+  :root {
+    --bg: #1e1e1e; --panel: #252526; --border: #3c3c3c; --text: #cccccc;
+    --muted: #8c8c8c; --accent: #0e639c; --danger: #f14c4c; --ok: #4ec9b0;
+    --input-bg: #3c3c3c; --input-fg: #cccccc; --hover: #2a2d2e;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font: 13px/1.45 "Segoe UI", "Ubuntu", "Noto Sans CJK SC", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .wrap { padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; }
+  .card label { font-size: 11px; color: var(--muted); letter-spacing: .4px; }
+  .card b { display: block; font-size: 19px; font-weight: 600; margin-top: 1px; }
+  .card span { font-size: 11px; color: var(--muted); }
+  .card.alert b { color: var(--danger); }
+
+  .bar { height: 8px; background: var(--input-bg); border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+  .bar.warn i { background: #d7a02c; }
+  .bar.danger i { background: var(--danger); }
+
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .meta .flex1 { flex: 1; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input, select, button {
+    font: inherit; color: var(--text); background: var(--input-bg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+  }
+  input:focus, select:focus, button:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+  input[type="search"] { min-width: 180px; }
+  button { cursor: pointer; }
+  button:hover { background: var(--hover); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  button.danger:hover { background: var(--hover); }
+  button.mini { padding: 2px 10px; font-size: 12px; }
+  .spacer { flex: 1; }
+
+  .list { flex: 1; overflow: auto; min-height: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+  .head, .row {
+    display: grid; align-items: center; gap: 10px; padding: 8px 12px;
+    grid-template-columns: minmax(150px, 1.5fr) minmax(170px, 1.2fr) 110px 100px 84px;
+  }
+  .head {
+    position: sticky; top: 0; z-index: 2; background: var(--panel);
+    border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted);
+    letter-spacing: .3px;
+  }
+  .row { border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--hover); }
+  .name .title { font-weight: 600; }
+  .name .sub { font-size: 11px; color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; margin-left: 6px; }
+  .usage .track { height: 6px; background: var(--input-bg); border-radius: 3px; overflow: hidden; margin-bottom: 2px; }
+  .usage .track i { display: block; height: 100%; background: var(--accent); opacity: .85; transition: width .3s; }
+  .usage .val { font-size: 11px; }
+  .cell { font-size: 12px; }
+  .cell .dim { color: var(--muted); font-size: 11px; }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+
+  .note { font-size: 11px; color: var(--muted); }
+  .toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 14px; box-shadow: 0 6px 18px rgba(0,0,0,.35); z-index: 40;
+    max-width: 80%;
+  }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  .hidden { display: none !important; }
+
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    min-width: 340px; max-width: 520px; padding: 18px 20px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45);
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 15px; }
+  .modal p { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .loading { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="cards">
+    <div class="card"><label id="l-used">已用</label><b id="v-used">—</b><span id="s-used"></span></div>
+    <div class="card"><label id="l-avail">可用</label><b id="v-avail">—</b><span id="s-avail"></span></div>
+    <div class="card" id="cache-card"><label id="l-cache">文件缓存</label><b id="v-cache">—</b><span id="s-cache"></span></div>
+    <div class="card" id="swap-card"><label id="l-swap">Swap</label><b id="v-swap">—</b><span id="s-swap"></span></div>
+  </section>
+
+  <div class="bar" id="bar"><i id="bar-fill"></i></div>
+  <div class="meta">
+    <span id="m-total"></span><span id="m-anon"></span><span id="m-slab"></span>
+    <span class="flex1"></span>
+    <span class="loading" id="m-stamp"></span>
+  </div>
+
+  <section class="toolbar">
+    <input id="q" type="search" placeholder="搜索应用…" autocomplete="off">
+    <select id="sort">
+      <option value="bytes">按占用排序</option>
+      <option value="reclaimable">按可回收排序</option>
+      <option value="peak">按峰值排序</option>
+      <option value="name">按名称排序</option>
+    </select>
+    <select id="budget">
+      <option value="256">上限 256 MB</option>
+      <option value="512" selected>上限 512 MB</option>
+      <option value="1024">上限 1 GB</option>
+      <option value="2048">上限 2 GB</option>
+    </select>
+    <select id="interval">
+      <option value="1">每 1s 刷新</option>
+      <option value="3" selected>每 3s 刷新</option>
+      <option value="5">每 5s 刷新</option>
+      <option value="10">每 10s 刷新</option>
+    </select>
+    <span class="spacer"></span>
+    <button id="btn-refresh" class="mini">立即刷新</button>
+    <button id="btn-drop" class="danger mini">整机清理缓存</button>
+  </section>
+
+  <div class="list" id="list">
+    <div class="head">
+      <span id="h-app">应用</span>
+      <span id="h-usage">占用</span>
+      <span id="h-reclaim">可回收</span>
+      <span id="h-peak">峰值</span>
+      <span></span>
+    </div>
+    <div id="rows"></div>
+    <div class="empty hidden" id="empty">没有匹配的应用</div>
+  </div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<div class="modal-mask hidden" id="mask">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <p id="modal-body"></p>
+    <div class="actions">
+      <button id="modal-cancel">取消</button>
+      <button id="modal-ok" class="primary">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const PLUGIN_ID = "mem-monitor";
+
+const TEXT = {
+  zh: {
+    used: "已用", avail: "可用", cache: "文件缓存", swap: "Swap",
+    ofTotal: "%s / %s", pct: "占总量 %s%", availHint: "含可回收缓存",
+    reclaimOf: "可回收约 %s", cacheHint: "drop_caches 可清理", swapHint: "%s / %s 已用",
+    total: "总内存 %s", anon: "匿名 %s", slab: "内核 %s",
+    app: "应用", usage: "占用", reclaim: "可回收", peak: "进程峰值",
+    search: "搜索应用…", sortUsage: "按占用排序", sortReclaim: "按可回收排序",
+    sortPeak: "按峰值排序", sortName: "按名称排序",
+    cap256: "上限 256 MB", cap512: "上限 512 MB", cap1g: "上限 1 GB", cap2g: "上限 2 GB",
+    every: "每 %ss 刷新", refresh: "立即刷新", drop: "整机清理缓存",
+    clean: "清理", system: "系统", container: "容器", procs: "%s 个进程", busy: "处理中…",
+    stamp: "更新于 %s", empty: "没有匹配的应用",
+    note: "清理只回收页缓存，不释放应用堆内存（Electron 应用需重启）；缓存卡片是整机 Cached+Buffers（含 tmpfs/映射页），与「可回收」合计不是同一口径，悬停查看。整机清理需一次 polkit 授权。",
+    dropTitle: "清理整机文件缓存？",
+    dropBody: "将执行 sync + drop_caches，释放约 %s 的文件缓存。首次读取文件会变慢，机器人任务运行期间不建议操作。",
+    cleanTitle: "回收 %s 的缓存？",
+    cleanBody: "尝试回收最多 %s 的文件缓存。这只影响该应用自己的磁盘缓存，不会中断它。",
+    freed: "已回收 %s", cleanFailed: "清理失败：%s", noTarget: "没有可回收的缓存",
+    cost: "预计可回收 %s", now: "已是最新",
+    noReclaim: "当前内核没有 memory.reclaim，只能使用整机清理。",
+    accounting: "文件缓存是整机 Cached+Buffers，含 tmpfs 和进程映射页；表格里的“可回收”只统计应用 cgroup 中干净、未映射且非 tmpfs 的页缓存，因此合计一定小于缓存总量，两者不是同一个口径。"
+  },
+  en: {
+    used: "Used", avail: "Available", cache: "File cache", swap: "Swap",
+    ofTotal: "%s / %s", pct: "%s% of total", availHint: "includes reclaimable cache",
+    reclaimOf: "about %s reclaimable", cacheHint: "free with drop_caches", swapHint: "%s / %s used",
+    total: "Total %s", anon: "Anon %s", slab: "Kernel %s",
+    app: "Application", usage: "Usage", reclaim: "Reclaimable", peak: "Peak/proc",
+    search: "Search apps…", sortUsage: "Sort by usage", sortReclaim: "Sort by reclaimable",
+    sortPeak: "Sort by peak", sortName: "Sort by name",
+    cap256: "cap 256 MB", cap512: "cap 512 MB", cap1g: "cap 1 GB", cap2g: "cap 2 GB",
+    every: "every %ss", refresh: "Refresh", drop: "Clear system cache",
+    clean: "Clean", system: "system", container: "container", procs: "%s processes", busy: "Working…",
+    stamp: "updated %s", empty: "No matching application",
+    note: "Cleaning only reclaims page cache; application heap does not shrink (Electron apps need a restart). The cache card is system-wide Cached+Buffers (incl. tmpfs/mapped pages), so it is not the same measure as the Reclaimable sum — hover for details. System-wide clean asks for polkit authorization.",
+    dropTitle: "Clear the system-wide file cache?",
+    dropBody: "Runs sync + drop_caches and frees about %s of file cache. First reads get slower; avoid this while robot tasks are running.",
+    cleanTitle: "Reclaim cache for %s?",
+    cleanBody: "Reclaims at most %s of file cache for this application only. It will not be interrupted.",
+    freed: "Freed %s", cleanFailed: "Cleanup failed: %s", noTarget: "Nothing to reclaim",
+    cost: "about %s reclaimable", now: "Up to date",
+    noReclaim: "This kernel has no memory.reclaim; only the system-wide clean is available.",
+    accounting: "File cache is system-wide Cached+Buffers and includes tmpfs plus mapped pages. The per-app Reclaimable column only counts clean, unmapped, non-tmpfs page cache inside each cgroup, so the sum is always smaller than the cache card."
+  }
+};
+
+let lang = "zh";
+let snapshot = null;
+let busy = false;
+let opened = false;
+const T = () => TEXT[lang] || TEXT.zh;
+
+function $(id) { return document.getElementById(id); }
+
+function post(action, data) {
+  parent.postMessage({__scpro: true, plugin: PLUGIN_ID, action: action, data: data || {}}, "*");
+}
+
+function fmt(bytes) {
+  if (!bytes) return "0 MB";
+  if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + " GB";
+  if (bytes >= 1024 ** 2) return Math.round(bytes / 1024 ** 2) + " MB";
+  return Math.round(bytes / 1024) + " KB";
+}
+
+function applyTheme(payload) {
+  if (!payload) return;
+  const root = document.documentElement;
+  root.dataset.theme = payload.dark ? "dark" : "light";
+  Object.entries(payload.colors || {}).forEach(([key, value]) => {
+    root.style.setProperty("--" + key.replace(/_/g, "-"), value);
+  });
+  if (payload.lang && TEXT[payload.lang]) {
+    lang = payload.lang;
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    applyStaticText();
+  }
+}
+
+function applyStaticText() {
+  const zh = lang === "zh";
+  $("l-used").textContent = T().used;
+  $("l-avail").textContent = T().avail;
+  $("l-cache").textContent = T().cache;
+  $("l-swap").textContent = T().swap;
+  $("h-app").textContent = T().app;
+  $("h-usage").textContent = T().usage;
+  $("h-reclaim").textContent = T().reclaim;
+  $("h-peak").textContent = T().peak;
+  $("q").placeholder = T().search;
+  const sort = $("sort");
+  sort.options[0].text = T().sortUsage;
+  sort.options[1].text = T().sortReclaim;
+  sort.options[2].text = T().sortPeak;
+  sort.options[3].text = T().sortName;
+  const budget = $("budget");
+  budget.options[0].text = T().cap256;
+  budget.options[1].text = T().cap512;
+  budget.options[2].text = T().cap1g;
+  budget.options[3].text = T().cap2g;
+  [...$("interval").options].forEach(option => {
+    option.text = T().every.replace("%s", option.value);
+  });
+  $("btn-refresh").textContent = T().refresh;
+  $("btn-drop").textContent = T().drop;
+  $("note").textContent = T().note;
+  $("empty").textContent = T().empty;
+  document.title = zh ? "内存监控" : "Memory Monitor";
+}
+
+function titleOf(app) {
+  return lang === "zh" ? (app.title_zh || app.name) : (app.title_en || app.name);
+}
+
+function render() {
+  if (!snapshot) return;
+  const g = snapshot.global || {};
+  const GB = 1024 ** 3;
+  $("v-used").textContent = fmt(g.used);
+  $("s-used").textContent = ((g.used || 0) / GB).toFixed(1) + " / " + (g.total / GB).toFixed(1) + " GB";
+  $("v-avail").textContent = fmt(g.available);
+  $("s-avail").textContent = T().pct.replace("%s", g.percent);
+  $("v-cache").textContent = fmt(g.cache);
+  const acc = snapshot.accounting || {};
+  $("s-cache").textContent = T().reclaimOf.replace("%s", fmt(acc.reclaimable || 0));
+  $("v-swap").textContent = (g.swap_used / GB).toFixed(1) + " GB";
+  $("s-swap").textContent = T().swapHint.replace("%s", (g.swap_used / GB).toFixed(1))
+                                       .replace("%s", (g.swap_total / GB).toFixed(1));
+  $("swap-card").classList.toggle("alert", g.swap_total > 0 && g.swap_used / g.swap_total > 0.9);
+
+  const fill = $("bar-fill");
+  fill.style.width = Math.min(100, g.percent || 0) + "%";
+  $("bar").className = "bar" + (g.percent >= 90 ? " danger" : g.percent >= 75 ? " warn" : "");
+  $("m-total").textContent = T().total.replace("%s", (g.total / GB).toFixed(1) + " GB");
+  $("m-anon").textContent = T().anon.replace("%s", (g.anon / GB).toFixed(1) + " GB");
+  $("m-slab").textContent = T().slab.replace("%s", (g.slab / GB).toFixed(1) + " GB");
+  $("m-stamp").textContent = T().stamp.replace("%s", new Date((snapshot.ts || 0) * 1000).toLocaleTimeString());
+  $("m-stamp").className = "loading";
+  $("note").textContent = snapshot.reclaim_supported === false
+    ? T().noReclaim + " " + T().note : T().note;
+  $("note").title = T().accounting;
+  $("cache-card").title = T().accounting;
+
+  renderRows();
+}
+
+function renderRows() {
+  const rows = $("rows");
+  const scrollTop = $("list").scrollTop;
+  rows.innerHTML = "";
+  const query = ($("q").value || "").trim().toLowerCase();
+  const sort = $("sort").value;
+  const apps = (snapshot.apps || []).filter(app => {
+    if (!query) return true;
+    return (app.name + " " + titleOf(app)).toLowerCase().includes(query);
+  });
+  apps.sort((a, b) => {
+    if (sort === "name") return titleOf(a).localeCompare(titleOf(b));
+    if (sort === "peak") return b.peak - a.peak;
+    if (sort === "reclaimable") return b.reclaimable - a.reclaimable;
+    return b.bytes - a.bytes;
+  });
+  const max = apps.reduce((m, app) => Math.max(m, app.bytes), 1);
+  $("empty").classList.toggle("hidden", apps.length > 0);
+
+  apps.forEach(app => {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const name = document.createElement("div");
+    name.className = "name";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = titleOf(app);
+    if (app.kind !== "app") {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = app.kind === "container" ? T().container : T().system;
+      title.appendChild(badge);
+    }
+    const sub = document.createElement("span");
+    sub.className = "sub";
+    const pids = app.scopes.map(s => s.pid).filter(Boolean);
+    sub.textContent = pids.length > 1 ? T().procs.replace("%s", pids.length) + " · " + app.name
+                                      : app.name;
+    name.append(title, sub);
+
+    const usage = document.createElement("div");
+    usage.className = "usage";
+    const track = document.createElement("div");
+    track.className = "track";
+    const fill = document.createElement("i");
+    fill.style.width = Math.max(2, Math.round(app.bytes * 100 / max)) + "%";
+    track.appendChild(fill);
+    const val = document.createElement("span");
+    val.className = "val";
+    val.textContent = fmt(app.bytes);
+    usage.append(track, val);
+
+    const reclaim = document.createElement("div");
+    reclaim.className = "cell";
+    reclaim.innerHTML = '<div>' + fmt(app.reclaimable) + '</div><div class="dim">'
+      + T().reclaim + '</div>';
+
+    const peak = document.createElement("div");
+    peak.className = "cell";
+    peak.innerHTML = '<div>' + fmt(app.peak) + '</div><div class="dim">'
+      + (app.swap > 0 ? "swap " + fmt(app.swap) : "") + '</div>';
+
+    const action = document.createElement("div");
+    const button = document.createElement("button");
+    button.className = "mini";
+    button.textContent = T().clean;
+    button.disabled = busy || snapshot.reclaim_supported === false
+      || app.reclaimable < 8 * 1024 * 1024;
+    button.onclick = () => askReclaim(app);
+    action.appendChild(button);
+
+    row.append(name, usage, reclaim, peak, action);
+    rows.appendChild(row);
+  });
+  $("list").scrollTop = scrollTop;
+}
+
+function renderBusy() {
+  document.querySelectorAll("#rows button").forEach(button => {
+    button.disabled = busy || button.dataset.blocked === "1";
+  });
+  $("btn-drop").disabled = busy;
+  $("btn-refresh").disabled = busy;
+  $("m-stamp").textContent = busy ? T().busy : (snapshot
+    ? T().stamp.replace("%s", new Date((snapshot.ts || 0) * 1000).toLocaleTimeString())
+    : "");
+  if (!busy) renderRows();
+}
+
+function toast(message, isError) {
+  const box = $("toast");
+  box.textContent = message;
+  box.className = "toast" + (isError ? " error" : "");
+  clearTimeout(window.__toast);
+  window.__toast = setTimeout(() => { box.className = "toast hidden"; }, 4000);
+}
+
+function confirmBox(title, body, onOk, okText) {
+  $("modal-title").textContent = title;
+  $("modal-body").textContent = body;
+  $("modal-ok").textContent = okText || (lang === "zh" ? "确定" : "OK");
+  $("mask").classList.remove("hidden");
+  const close = () => $("mask").classList.add("hidden");
+  $("modal-cancel").onclick = close;
+  $("modal-ok").onclick = () => { close(); onOk(); };
+}
+
+function askReclaim(app) {
+  const cap = parseInt($("budget").value, 10);
+  const estimate = Math.min(app.reclaimable, cap * 1024 * 1024);
+  confirmBox(
+    T().cleanTitle.replace("%s", titleOf(app)),
+    T().cleanBody.replace("%s", fmt(estimate)) + " " + T().cost.replace("%s", fmt(app.reclaimable)),
+    () => {
+      const cgroups = app.scopes.filter(s => s.has_reclaim).map(s => s.cgroup);
+      if (!cgroups.length) { toast(T().noTarget, true); return; }
+      busy = true;
+      renderBusy();
+      post("reclaim", {cgroups: cgroups, mbytes: cap});
+    });
+}
+
+function askDropCache() {
+  const g = (snapshot && snapshot.global) || {};
+  const acc = (snapshot && snapshot.accounting) || {};
+  confirmBox(T().dropTitle,
+    T().dropBody.replace("%s", fmt(acc.drop_estimate || g.cache)),
+    () => {
+      busy = true;
+      renderBusy();
+      post("drop", {level: 3});
+    });
+}
+
+window.addEventListener("message", event => {
+  const msg = event.data;
+  if (!msg || msg.__scpro_event !== true) return;
+  if (msg.event === "theme") { applyTheme(msg.data); return; }
+  if (msg.event === "snapshot") {
+    snapshot = msg.data;
+    busy = !!snapshot.busy;
+    $("interval").value = String(snapshot.interval || 3);
+    if (!opened) { opened = true; post("activate"); }
+    render();
+    renderBusy();
+    return;
+  }
+  if (msg.event === "busy") { busy = !!msg.data.busy; renderBusy(); return; }
+  if (msg.event === "clean") {
+    busy = false;
+    const result = msg.data || {};
+    if (result.action === "drop") {
+      if (result.ok) toast(T().freed.replace("%s", fmt(result.freed)));
+      else toast(T().cleanFailed.replace("%s", result.error || "?"), true);
+    } else {
+      if (result.ok) toast(T().freed.replace("%s", fmt(result.freed)));
+      else toast(T().cleanFailed.replace("%s", result.error || "?"), true);
+    }
+    post("snapshot");
+    return;
+  }
+  if (msg.event === "error") {
+    busy = false;
+    toast(msg.data && msg.data.error ? msg.data.error : "error", true);
+    renderBusy();
+  }
+});
+
+$("q").addEventListener("input", renderRows);
+$("sort").addEventListener("change", renderRows);
+$("btn-refresh").onclick = () => post("snapshot");
+$("btn-drop").onclick = askDropCache;
+$("interval").addEventListener("change", event => {
+  post("set-interval", {seconds: parseInt(event.target.value, 10)});
+});
+
+applyStaticText();
+post("activate");
+post("snapshot");
+</script>
+</body>
+</html>

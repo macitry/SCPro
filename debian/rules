@@ -40,8 +40,13 @@ binary-indep: build
 	           $(DEST)/usr/share/icons/hicolor/scalable/apps \
 	           $(DEST)/usr/share/man/man1 $(DOCDIR)
 
-	install -m 644 main.py backend.py deploy_core.py vscode_theme.py $(SHAREDIR)/
+	install -m 644 main.py backend.py deploy_core.py vscode_theme.py \
+	               plugin_host.py $(SHAREDIR)/
 	cp -a web $(SHAREDIR)/web
+	cp -a plugins $(SHAREDIR)/plugins
+	rm -rf $(SHAREDIR)/plugins/__pycache__ \
+	       $(SHAREDIR)/plugins/*/__pycache__ \
+	       $(SHAREDIR)/plugins/*/plugin-data
 	rm -f $(SHAREDIR)/web/assets/folder.svg \
 	      $(SHAREDIR)/web/assets/folder-open.svg \
 	      $(SHAREDIR)/web/assets/file.svg

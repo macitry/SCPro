@@ -435,3 +435,20 @@ input:focus, select:focus { border-color: var(--accent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- 插件 webview（活动栏图标 + 全屏 iframe 面板） ---- */
+.plugin-acts { display: flex; flex-direction: column; }
+.plugin-view {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+}
+.plugin-head {
+  display: flex; align-items: center; gap: 8px;
+  flex: 0 0 38px; height: 38px; padding: 0 10px;
+  background: var(--sidebar); border-bottom: 1px solid var(--border);
+}
+.plugin-head .codicon { font-size: 16px; color: var(--accent); }
+.plugin-title { font-weight: 600; }
+.plugin-version { font-size: 11px; opacity: .8; }
+.plugin-frame { flex: 1 1 auto; width: 100%; border: 0; background: var(--bg); }

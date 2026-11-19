@@ -32,6 +32,7 @@ from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow,
 
 import backend
 import vscode_theme
+from plugin_host import PluginHost
 
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
@@ -230,10 +231,15 @@ class Bridge:
         self.stop_timer = QTimer(self.window_ref)
         self.stop_timer.setSingleShot(True)
         self.stop_timer.timeout.connect(self._force_stop)
+        self.plugins = PluginHost(
+            self, APP_DIR, WEB_DIR,
+            data_dir=backend.core.CONFIG_DIR / "plugin-data",
+            extra_dirs=[backend.core.CONFIG_DIR / "plugins"])
+        self.plugins.load_all()
 
     # ---- 推送 ----
     def _js(self, fn: str, payload) -> None:
-        page = self.window_ref.page
+        page = getattr(self.window_ref, "page", None)
         if page is None:
             return
         page.runJavaScript("%s(%s);" % (fn, json.dumps(payload, ensure_ascii=False)))
@@ -267,6 +273,9 @@ class Bridge:
             except Exception:
                 pass
 
+    def push_plugins(self) -> None:
+        self._js("window.scproPlugins", self.plugins.describe())
+
     def push_status(self, state: str, done: int = 0, total: int = 0) -> None:
         self._js("window.scproStatus", {"state": state, "done": done, "total": total})
         if getattr(self.window_ref, "tray", None) is not None:
@@ -281,6 +290,10 @@ class Bridge:
             payload = json.loads(data) if data else {}
         except ValueError:
             payload = {}
+
+        if command.startswith("plugin/"):
+            self.plugins.handle(command, payload)
+            return
 
         if command == "get-state":
             self.push_state()
@@ -1103,7 +1116,9 @@ class AppPage(QWebEnginePage):
 
     def acceptNavigationRequest(self, url, nav_type, is_main_frame) -> bool:
         if url.scheme() == "scpro":
-            self.bridge.handle(url.host(), dict(parse_qsl(url.query())))
+            # 插件命令用路径表达：scpro://plugin/<id>/<action>
+            command = url.host() + url.path().rstrip("/")
+            self.bridge.handle(command, dict(parse_qsl(url.query())))
             return False
         return super().acceptNavigationRequest(url, nav_type, is_main_frame)
 
@@ -1214,6 +1229,13 @@ class MainWindow(QMainWindow):
         self.view.setPage(self.page)
         settings = self.view.settings()
         settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
+        # scpro:// 是自定义协议：默认策略只允许"用户手势"触发的跳转，
+        # 插件面板（iframe / postMessage / 定时推送）的消息会被静默拦截。
+        try:
+            settings.setUnknownUrlSchemePolicy(
+                QWebEngineSettings.AllowAllUnknownUrlSchemes)
+        except AttributeError:
+            pass
         layout.addWidget(self.view, 1)
 
         self.page.loadFinished.connect(self._on_load)
@@ -1286,6 +1308,7 @@ class MainWindow(QMainWindow):
             self.bridge._js("window.scproTheme",
                             {"colors": self.theme["colors"], "dark": self.theme["dark"]})
             self.bridge._js("window.scproAssets", self.theme["icons"])
+            self.bridge.push_plugins()
             self.bridge._js("window.scproUi",
                             {"panel_h": self.bridge.app_settings.get("panel_h", 228),
                              "language": self.bridge.app_settings.get("language", "zh"),
@@ -1447,6 +1470,10 @@ class MainWindow(QMainWindow):
         self.bridge.log("[INFO] 已重新加载 VS Code 主题: %s" % self.theme["name"])
 
     def closeEvent(self, event) -> None:
+        try:
+            self.bridge.plugins.shutdown()
+        except Exception:
+            pass
         self.tray.hide()
         save_app_settings({"window": [self.width(), self.height()]})
         event.accept()

@@ -1,0 +1,11 @@
+{
+  "id": "mem-monitor",
+  "name": "内存监控",
+  "name_en": "Memory Monitor",
+  "version": "1.0.0",
+  "description": "按应用统计整机内存占用，回收指定应用的文件缓存",
+  "description_en": "Per-app memory usage and file-cache reclaim",
+  "icon": "pulse",
+  "entry": "plugin.py",
+  "panel": "panel.html"
+}

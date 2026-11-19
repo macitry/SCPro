@@ -58,6 +58,13 @@ ritual for every board. SCPro turns that into: **pick a host, tick projects, upl
 - Drag to reorder projects; search projects and hosts; selection is remembered across
   restarts
 
+**Plugins**
+
+- Plug-in directory with a `plugin.json` manifest: drop a folder into `plugins/`, no build step
+- Plugins contribute an activity-bar icon and an isolated webview panel (iframe), like a tiny VS Code extension
+- Bundled **Memory Monitor**: per-app memory usage from cgroup v2, one-click reclaim of a single
+  app's file cache, and a system-wide `drop_caches` action
+
 **Look & feel**
 
 - VS Code color themes and file icons, resolved from your own
@@ -84,6 +91,30 @@ ritual for every board. SCPro turns that into: **pick a host, tick projects, upl
 
 The GUI never implements deployment logic itself: it builds exactly the same command
 line you would run in a terminal and streams its output back into the log panel.
+
+## Plugins
+
+A plugin is a folder — drop it into `plugins/` (or `~/.config/scpro/plugins/`) and restart:
+
+```
+plugins/mem-monitor/
+├── plugin.json    # id, name, icon, entry, panel
+├── plugin.py      # class Plugin: on_load / handle / on_unload
+└── panel.html     # optional webview panel, runs in an iframe
+```
+
+Each plugin gets an activity-bar icon and a full-size panel. The UI talks to Python through
+`plugin/<id>/<action>` commands; Python pushes events back with `context.ui(event, data)`,
+and a `theme` event keeps the panel in sync with the VS Code theme. The full contract lives in
+[plugins/README.md](plugins/README.md).
+
+![Memory monitor plugin](docs/plugin-memory.png)
+
+The bundled **mem-monitor** plugin samples cgroup v2 (`memory.current`, `memory.peak`,
+`memory.swap.current`) plus `/proc/meminfo`, merges multi-process apps (three Feishu processes
+become one row), and reclaims a chosen app's page cache by writing to `memory.reclaim`
+(falls back to `pkexec` / `sudo -n`). The system-wide button runs `sync` + `drop_caches`.
+Note that page-cache reclaim does not shrink an app's heap — Electron apps need a restart for that.
 
 ## Quick start
 

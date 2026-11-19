@@ -77,6 +77,28 @@ SCPro 把它变成：**选 Host、勾项目、上传**。
 界面本身不实现部署逻辑：它拼出的命令与你在终端手敲的完全一致，
 再把子进程输出实时送回日志面板。
 
+## 插件
+
+插件就是一个目录，放进 `plugins/`（安装模式下也可放 `~/.config/scpro/plugins/`），重启即生效：
+
+```
+plugins/mem-monitor/
+├── plugin.json    # id、名称、图标、入口、面板
+├── plugin.py      # class Plugin：on_load / handle / on_unload
+└── panel.html     # 可选，在 iframe 里运行的 webview 面板
+```
+
+每个插件在活动栏有一个图标和一个全尺寸面板。前端用 `plugin/<id>/<action>` 命令调用 Python，
+Python 用 `context.ui(event, data)` 推事件回面板；宿主还会推送 `theme` 事件让面板跟随 VS Code 主题。
+完整约定见 [plugins/README.md](plugins/README.md)。
+
+![内存监控插件](docs/plugin-memory.png)
+
+内置的 **mem-monitor** 读取 cgroup v2 的 `memory.current` / `memory.peak` / `memory.swap.current`
+和 `/proc/meminfo`，把同名多进程（比如飞书 3 个进程）合并成一行；点「清理」会往目标 cgroup 的
+`memory.reclaim` 写值回收页缓存（失败时回退到 `pkexec` / `sudo -n`），「整机清理缓存」执行
+`sync` + `drop_caches`。注意：回收页缓存不会释放应用堆内存，Electron 应用要重启才会真正降下来。
+
 ## 快速开始
 
 ```bash
