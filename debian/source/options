@@ -13,3 +13,6 @@ tar-ignore = deploy/robot_connections.yaml
 tar-ignore = *.deb
 tar-ignore = *.buildinfo
 tar-ignore = *.changes
+tar-ignore = deploy/plugin-data
+tar-ignore = plugins/*/__pycache__
+tar-ignore = plugins/*/plugin-data

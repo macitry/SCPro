@@ -58,7 +58,7 @@ binary-indep: build
 	      $(SHAREDIR)/deploy/ssh_config \
 	      $(SHAREDIR)/deploy/robot_connections.yaml
 	rm -f $(SHAREDIR)/deploy/*.bak $(SHAREDIR)/deploy/*.tmp
-	rm -rf $(SHAREDIR)/deploy/__pycache__
+	rm -rf $(SHAREDIR)/deploy/__pycache__ $(SHAREDIR)/deploy/plugin-data
 
 	install -m 644 scpro.svg $(SHAREDIR)/scpro.svg
 	install -m 644 scpro.svg $(DEST)/usr/share/icons/hicolor/scalable/apps/scpro.svg

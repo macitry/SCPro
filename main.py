@@ -37,7 +37,7 @@ from plugin_host import PluginHost
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
 ICON_SVG = APP_DIR / "scpro.svg"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 APP_SETTINGS = backend.core.SETTINGS_JSON
 AUTOSTART_FILE = Path.home() / ".config" / "autostart" / "scpro.desktop"
 LOG_DIR = backend.core.STATE_DIR
