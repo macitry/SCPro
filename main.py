@@ -63,6 +63,8 @@ def load_app_settings() -> dict:
         "language": "zh",
         "delete_remote": False,
         "theme_id": "",
+        "selected": [],
+        "selected_by_host": {},
     }
     try:
         data = json.loads(APP_SETTINGS.read_text(encoding="utf-8"))
@@ -1081,6 +1083,14 @@ class Bridge:
             cleaned = [str(x) for x in selected][:200]
             if cleaned != self.app_settings.get("selected"):
                 updates["selected"] = cleaned
+        by_host = payload.get("selected_by_host")
+        if isinstance(by_host, dict):
+            cleaned_map = {}
+            for host, ids in list(by_host.items())[:200]:
+                if isinstance(ids, list):
+                    cleaned_map[str(host)] = [str(x) for x in ids][:200]
+            if cleaned_map != self.app_settings.get("selected_by_host"):
+                updates["selected_by_host"] = cleaned_map
         if updates:
             save_app_settings(updates)
             self.app_settings = load_app_settings()
@@ -1313,6 +1323,8 @@ class MainWindow(QMainWindow):
                             {"panel_h": self.bridge.app_settings.get("panel_h", 228),
                              "language": self.bridge.app_settings.get("language", "zh"),
                              "selected": self.bridge.app_settings.get("selected", []),
+                             "selected_by_host": self.bridge.app_settings.get(
+                                 "selected_by_host", {}),
                              "delete_remote": bool(
                                  self.bridge.app_settings.get("delete_remote", False))})
             self.bridge.push_state()

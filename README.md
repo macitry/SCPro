@@ -52,6 +52,7 @@ ritual for every board. SCPro turns that into: **pick a host, tick projects, upl
   online/offline status
 - Add or remove hosts from the sidebar; changes go to `~/.ssh/config` with a `.bak`
   backup and are mirrored to the project copy
+- Project selections are remembered per host; switching back restores them
 - Wildcard target rules per project, with a hit preview in the editor
 - HTML project editor: local source picker, remote directory name, ordered host rules,
   exclude profiles and a lazily expanded exclusion tree

@@ -5,6 +5,7 @@ const state = {
   projects: [],
   currentHost: "",
   selected: new Set(),
+  selectedByHost: {},
   running: false,
   assets: {},
   hostQuery: "",
@@ -236,18 +237,44 @@ function el(tag, cls, text) {
 }
 
 window.scproState = function (payload) {
+  const previousHost = state.currentHost || "";
+  const nextHost = payload.current_host || "";
   state.hosts = payload.hosts || [];
   state.projects = payload.projects || [];
-  state.currentHost = payload.current_host || "";
+
+  // 切走之前，把当前 Host 的勾选记下来
+  if (previousHost && previousHost !== nextHost) {
+    state.selectedByHost[previousHost] = [...state.selected];
+  }
+  state.currentHost = nextHost;
+
   const usable = new Set(state.projects
     .filter(p => p.remote && !p.error)
     .map(p => p.id));
+  if (nextHost !== previousHost) {
+    const remembered = state.selectedByHost[nextHost];
+    if (Array.isArray(remembered)) {
+      state.selected = new Set(remembered);
+    } else if (previousHost) {
+      // 首次去某个 Host：不继承上一个 Host 的勾选
+      state.selected = new Set();
+    }
+  }
+
   const before = state.selected.size;
   state.selected = new Set([...state.selected].filter(id => usable.has(id)));
   const dropped = before - state.selected.size;
-  if (dropped > 0) {
-    window.scproToast(t("toast.selection_dropped", dropped));
-    send("save-ui", {panel_h: panelHeight, selected: [...state.selected]});
+  const hostChanged = previousHost !== nextHost;
+  if (nextHost) state.selectedByHost[nextHost] = [...state.selected];
+  if (hostChanged || dropped > 0) {
+    send("save-ui", {
+      panel_h: panelHeight,
+      selected: [...state.selected],
+      selected_by_host: state.selectedByHost,
+    });
+    if (dropped > 0) {
+      window.scproToast(t("toast.selection_dropped", dropped));
+    }
   }
   render();
 };
@@ -276,6 +303,10 @@ window.scproUi = function (payload) {
   if (payload && payload.language) applyLanguage(payload.language);
   if (payload && typeof payload.delete_remote === "boolean") {
     state.deleteRemote = payload.delete_remote;
+  }
+  if (payload && payload.selected_by_host
+      && typeof payload.selected_by_host === "object") {
+    state.selectedByHost = payload.selected_by_host;
   }
   if (payload && Array.isArray(payload.selected)) {
     state.selected = new Set(payload.selected);
@@ -541,8 +572,15 @@ function render() {
     check.disabled = disabled && !check.checked;
     check.onchange = () => {
       if (check.checked) state.selected.add(p.id); else state.selected.delete(p.id);
+      if (state.currentHost) {
+        state.selectedByHost[state.currentHost] = [...state.selected];
+      }
       updateRunButton();
-      send("save-ui", {panel_h: panelHeight, selected: [...state.selected]});
+      send("save-ui", {
+        panel_h: panelHeight,
+        selected: [...state.selected],
+        selected_by_host: state.selectedByHost,
+      });
     };
     row.appendChild(check);
     const nameWrap = el("span", "name");
