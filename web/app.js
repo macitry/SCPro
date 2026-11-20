@@ -31,7 +31,7 @@ let dragProjectId = null;
 const I18N = {
   zh: {
     "app.title": "SCPro",
-    "tab.projects": "项目", "tab.hosts": "Hosts", "tab.log": "输出", "tab.settings": "设置",
+    "tab.hosts": "Hosts", "tab.log": "输出", "tab.settings": "设置",
     "hosts.header": "HOSTS", "hosts.search": "搜索 Host…", "hosts.settings": "Host 设置",
     "hosts.refresh": "从 ~/.ssh/config 刷新", "hosts.title": "Host 设置",
     "hosts.ignore": "忽略名单（每行一个通配模式，如 *-host）",
@@ -140,7 +140,7 @@ const I18N = {
   },
   en: {
     "app.title": "SCPro",
-    "tab.projects": "Projects", "tab.hosts": "Hosts", "tab.log": "Output", "tab.settings": "Settings",
+    "tab.hosts": "Hosts", "tab.log": "Output", "tab.settings": "Settings",
     "hosts.header": "HOSTS", "hosts.search": "Search hosts…", "hosts.settings": "Host settings",
     "hosts.refresh": "Sync from ~/.ssh/config", "hosts.title": "Host settings",
     "hosts.ignore": "Ignore list (one glob per line, e.g. *-host)",
@@ -951,17 +951,15 @@ function openContextMenu(anchor, items) {
   menu.style.top = Math.max(8, top) + "px";
 }
 
-function setActivity(view) {
-  document.querySelectorAll(".act[data-view]").forEach(item => {
-    item.classList.toggle("active", item.dataset.view === view);
-  });
-}
-
+// 活动栏只有「输出」是真正的开关：面板开着才高亮。
+// 侧栏用 aria-expanded 表达状态，不再参与互斥高亮（那套模型在这里是假的）。
 function setLogPanel(visible) {
   const panel = document.getElementById("panel");
   panel.style.display = visible ? "flex" : "none";
   panel.setAttribute("aria-hidden", visible ? "false" : "true");
-  setActivity(visible ? "log" : "projects");
+  const logButton = document.querySelector('.act[data-view="log"]');
+  logButton.classList.toggle("active", visible);
+  logButton.setAttribute("aria-pressed", visible ? "true" : "false");
   const toggle = document.getElementById("btn-toggle");
   toggle.textContent = visible ? "▾" : "▸";
   toggle.title = t(visible ? "panel.hide" : "panel.show");
@@ -974,7 +972,6 @@ function toggleHostSidebar() {
   const collapsed = sidebar.classList.toggle("collapsed");
   sidebar.setAttribute("aria-hidden", collapsed ? "true" : "false");
   hostButton.setAttribute("aria-expanded", collapsed ? "false" : "true");
-  setActivity(collapsed ? "projects" : "hosts");
   if (!collapsed) {
     const search = document.getElementById("host-search");
     search.focus();
@@ -1411,12 +1408,6 @@ function bind() {
     setLogPanel(panel.style.display === "none");
   };
   document.getElementById("btn-new").onclick = () => send("new-project");
-  document.getElementById("btn-more").onclick = event => {
-    event.stopPropagation();
-    openContextMenu(document.getElementById("btn-more"), [
-      {label: t("hosts.refresh"), action: () => send("refresh")},
-    ]);
-  };
   document.getElementById("btn-settings").onclick = () => send("settings");
 
   document.getElementById("ed-cancel").onclick = () =>
@@ -1503,9 +1494,6 @@ function bind() {
         setLogPanel(panel.style.display === "none");
       } else if (view === "hosts") {
         toggleHostSidebar();
-      } else if (view === "projects") {
-        setActivity("projects");
-        document.getElementById("ws-search").focus();
       }
     };
   });

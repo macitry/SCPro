@@ -10,13 +10,10 @@
 <body>
   <div class="app">
     <nav class="activity">
-      <button class="act active" data-view="projects" data-i18n-title="tab.projects" title="项目">
-        <span class="codicon codicon-files"></span>
-      </button>
       <button class="act" data-view="hosts" data-i18n-title="tab.hosts" title="Hosts" aria-expanded="true">
         <span class="codicon codicon-server"></span>
       </button>
-      <button class="act" data-view="log" data-i18n-title="tab.log" title="输出">
+      <button class="act active" data-view="log" data-i18n-title="tab.log" title="输出" aria-pressed="true">
         <span class="codicon codicon-terminal"></span>
       </button>
       <div id="plugin-acts" class="plugin-acts"></div>
@@ -50,7 +47,6 @@
         <span id="host-warning" class="warn-text hidden" data-i18n="host.warning">没有项目规则匹配该 Host</span>
         <div class="flex1"></div>
         <button id="btn-test" class="btn" data-i18n="btn.test_short">测试</button>
-        <button id="btn-more" class="icon" data-i18n-title="menu.more" title="更多">⋯</button>
         <button id="btn-run" class="btn primary" data-i18n="btn.run">上传选中</button>
       </div>
 
