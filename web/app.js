@@ -7,9 +7,7 @@ const state = {
   workspace: [],          // 工作台项目 id（全局，顺序即展示顺序）
   activeProject: "",      // 详情区当前项目
   selected: new Set(),    // 工作台里勾选待上传的项目
-  selectedByHost: {},     // 旧设置兼容，不再写入
   running: false,
-  assets: {},
   hostQuery: "",
   projectQuery: "",
   lang: "zh",
@@ -303,13 +301,24 @@ window.scproState = function (payload) {
   const known = new Set(state.projects.map(project => project.id));
   const before = state.workspace.length;
   state.workspace = state.workspace.filter(id => known.has(id));
-  // 上传勾选必须是工作台的子集，否则会出现“勾了但看不见”的项目
+
+  // 上传勾选必须是「工作台 ∩ 当前 Host 可用」的子集：
+  // 切到没有规则（或配置有错）的 Host 时，勾选要同步取消并告知用户，
+  // 否则按钮上的数量会大于实际会上传的项目数。
+  const usable = new Set(state.projects
+    .filter(project => project.remote && !project.error)
+    .map(project => project.id));
   const inWorkspace = new Set(state.workspace);
-  state.selected = new Set([...state.selected].filter(id => inWorkspace.has(id)));
+  const checked = state.selected.size;
+  state.selected = new Set([...state.selected].filter(
+    id => usable.has(id) && inWorkspace.has(id)));
+  const dropped = checked - state.selected.size;
+
   if (!known.has(state.activeProject)) {
     state.activeProject = state.workspace[0] || "";
   }
-  if (state.workspace.length !== before) saveWorkspace();
+  if (state.workspace.length !== before || dropped > 0) saveWorkspace();
+  if (dropped > 0) window.scproToast(t("toast.selection_dropped", dropped));
   render();
 };
 
@@ -324,11 +333,6 @@ window.scproTheme = function (payload) {
   pushPluginTheme();
 };
 
-window.scproAssets = function (assets) {
-  state.assets = assets || {};
-  render();
-};
-
 window.scproUi = function (payload) {
   if (payload && payload.panel_h) {
     panelHeight = Math.max(120, payload.panel_h);
@@ -337,10 +341,6 @@ window.scproUi = function (payload) {
   if (payload && payload.language) applyLanguage(payload.language);
   if (payload && typeof payload.delete_remote === "boolean") {
     state.deleteRemote = payload.delete_remote;
-  }
-  if (payload && payload.selected_by_host
-      && typeof payload.selected_by_host === "object") {
-    state.selectedByHost = payload.selected_by_host;
   }
   if (payload && Array.isArray(payload.selected)) {
     state.selected = new Set(payload.selected);
@@ -842,6 +842,8 @@ function libraryCard(project, isAdded) {
                        : t("row.no_rule"))));
   card.appendChild(meta);
   card.onclick = () => {
+    // 不可用项目加不进工作台，别让它在选择区里攒着
+    if (!usable) return;
     if (library.selection.has(project.id)) library.selection.delete(project.id);
     else library.selection.add(project.id);
     renderLibrary();
@@ -1520,6 +1522,7 @@ function bind() {
   document.getElementById("lib-add").onclick = () => {
     [...library.selection].forEach(id => {
       if (state.workspace.includes(id)) return;
+      if (!projectUsable(state.projects.find(item => item.id === id))) return;
       state.workspace.push(id);
       state.selected.add(id);
     });

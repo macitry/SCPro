@@ -64,13 +64,14 @@ def load_app_settings() -> dict:
         "delete_remote": False,
         "theme_id": "",
         "selected": [],
-        "selected_by_host": {},
         "workspace": [],
         "workspace_active": "",
     }
     try:
         data = json.loads(APP_SETTINGS.read_text(encoding="utf-8"))
         if isinstance(data, dict):
+            # 旧的“每个 Host 记住一份勾选”已被工作台取代，读到就丢掉
+            data.pop("selected_by_host", None)
             defaults.update(data)
     except Exception:
         pass
@@ -299,9 +300,7 @@ class Bridge:
             self.plugins.handle(command, payload)
             return
 
-        if command == "get-state":
-            self.push_state()
-        elif command == "set-host":
+        if command == "set-host":
             self._set_host(str(payload.get("host", "")))
         elif command == "refresh":
             self._refresh()
@@ -319,8 +318,6 @@ class Bridge:
             QTimer.singleShot(0, self._secrets_data)
         elif command == "save-secrets":
             self._save_secrets(payload.get("values") or {})
-        elif command == "move-project":
-            self._move_project(str(payload.get("name", "")), int(payload.get("delta", 0)))
         elif command == "settings":
             self._settings_data()
         elif command == "save-settings":
@@ -346,14 +343,10 @@ class Bridge:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(LOG_DIR)))
         elif command == "clear-cache":
             self._clear_upload_cache()
-        elif command == "reorder-projects":
-            self._reorder_projects(payload.get("order") or [])
         elif command == "update-host-key":
             self._update_host_key(str(payload.get("alias", "")))
         elif command == "reload-theme":
             self.window_ref.reload_theme()
-        elif command == "project-data":
-            self._project_data(str(payload.get("name", "")))
         elif command == "list-dir":
             self._list_dir(str(payload.get("path", "")))
         elif command == "choose-dir":
@@ -643,38 +636,6 @@ class Bridge:
 
         self.test_proc.finished.connect(done)
         self.test_proc.start(program, args)
-
-    def _move_project(self, name: str, delta: int) -> None:
-        if self.proc is not None or not name or not delta:
-            return
-        order = [p.title for p in backend.core.load_projects()]
-        if name not in order:
-            return
-        index = order.index(name)
-        target = index + delta
-        if not 0 <= target < len(order):
-            return
-        order[index], order[target] = order[target], order[index]
-        try:
-            backend.core.reorder_projects(order)
-            self.log("[INFO] 项目顺序：%s 移到第 %d 位" % (name, target + 1))
-        except Exception as exc:
-            self.log("[ERROR] 调整顺序失败: %s" % exc)
-        self.push_state()
-
-    def _reorder_projects(self, order: list) -> None:
-        if self.proc is not None or not order:
-            return
-        names = [p.title for p in backend.core.load_projects()]
-        if sorted(str(x) for x in order) != sorted(names):
-            self.log("[ERROR] 排序失败：项目列表已变化，请重试")
-            return
-        try:
-            backend.core.reorder_projects([str(x) for x in order])
-            self.log("[INFO] 已按拖拽结果更新项目顺序")
-        except Exception as exc:
-            self.log("[ERROR] 排序失败: %s" % exc)
-        self.push_state()
 
     def _update_host_key(self, alias: str) -> None:
         state = backend.snapshot()
@@ -1011,6 +972,8 @@ class Bridge:
 
     def _copy_project(self, name: str) -> None:
         if self.proc is not None:
+            self.log("[WARN] 任务执行中，暂不能复制项目")
+            self._js("window.scproToast", "任务执行中，暂不能复制项目")
             return
         core = backend.core
         data = core.load_yaml(core.PROJECTS_YAML)
@@ -1038,6 +1001,8 @@ class Bridge:
 
     def _delete_project(self, name: str) -> None:
         if self.proc is not None:
+            self.log("[WARN] 任务执行中，暂不能删除项目")
+            self._js("window.scproToast", "任务执行中，暂不能删除项目")
             return
         try:
             backend.delete_project(name)
@@ -1085,14 +1050,6 @@ class Bridge:
             cleaned = [str(x) for x in selected][:200]
             if cleaned != self.app_settings.get("selected"):
                 updates["selected"] = cleaned
-        by_host = payload.get("selected_by_host")
-        if isinstance(by_host, dict):
-            cleaned_map = {}
-            for host, ids in list(by_host.items())[:200]:
-                if isinstance(ids, list):
-                    cleaned_map[str(host)] = [str(x) for x in ids][:200]
-            if cleaned_map != self.app_settings.get("selected_by_host"):
-                updates["selected_by_host"] = cleaned_map
         workspace = payload.get("workspace")
         if isinstance(workspace, list):
             cleaned_ws = [str(x) for x in workspace][:500]
@@ -1327,14 +1284,11 @@ class MainWindow(QMainWindow):
         if ok:
             self.bridge._js("window.scproTheme",
                             {"colors": self.theme["colors"], "dark": self.theme["dark"]})
-            self.bridge._js("window.scproAssets", self.theme["icons"])
             self.bridge.push_plugins()
             self.bridge._js("window.scproUi",
                             {"panel_h": self.bridge.app_settings.get("panel_h", 228),
                              "language": self.bridge.app_settings.get("language", "zh"),
                              "selected": self.bridge.app_settings.get("selected", []),
-                             "selected_by_host": self.bridge.app_settings.get(
-                                 "selected_by_host", {}),
                              "workspace": self.bridge.app_settings.get("workspace", []),
                              "workspace_active": self.bridge.app_settings.get(
                                  "workspace_active", ""),
@@ -1491,7 +1445,6 @@ class MainWindow(QMainWindow):
         self.page.setBackgroundColor(QColor(colors["bg"]))
         self.bridge._js("window.scproTheme",
                         {"colors": colors, "dark": self.theme["dark"]})
-        self.bridge._js("window.scproAssets", self.theme["icons"])
         self.bridge.log("[INFO] 已重新加载 VS Code 主题: %s" % self.theme["name"])
 
     def closeEvent(self, event) -> None:
