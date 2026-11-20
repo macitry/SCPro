@@ -85,6 +85,9 @@ button { font: inherit; color: inherit; }
 .act:hover { opacity: 1; background: var(--hover); }
 .act.active { opacity: 1; border-left-color: var(--accent); }
 .act:focus-visible { outline: 1px solid var(--accent); outline-offset: -4px; }
+/* 鼠标点出来的焦点不画框（QtWebEngine 会把点击当成 :focus-visible）；
+   用 Tab 键操作时 pointer-nav 已被摘掉，上面那条键盘焦点框仍然生效。 */
+body.pointer-nav *:focus { outline: none; }
 
 .sidebar {
   width: 230px; flex: 0 0 230px;

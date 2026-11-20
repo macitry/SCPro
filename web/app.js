@@ -1384,6 +1384,15 @@ function saveEditor() {
 }
 
 function bind() {
+  // QtWebEngine 把鼠标点击也算进 :focus-visible，按下后会有一圈焦点框。
+  // 用输入模态区分：鼠标操作期间不画，Tab 回来再恢复。
+  document.addEventListener("mousedown", () => {
+    document.body.classList.add("pointer-nav");
+  }, true);
+  document.addEventListener("keydown", () => {
+    document.body.classList.remove("pointer-nav");
+  }, true);
+
   document.getElementById("btn-refresh").onclick = () => send("refresh");
   document.getElementById("btn-test").onclick = () => send("test");
   document.getElementById("btn-run").onclick = () => {
