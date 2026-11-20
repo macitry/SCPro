@@ -67,16 +67,24 @@ button { font: inherit; color: inherit; }
 }
 .act {
   width: 48px; height: 44px;
+  padding: 0;
   background: transparent; border: 0;
+  /* 左右各留 2px 透明边：既给选中条留位置，又让图标严格居中 */
+  border-left: 2px solid transparent;
+  border-right: 2px solid transparent;
   display: flex; align-items: center; justify-content: center;
   opacity: .65;
-  border-left: 2px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity .12s ease, background .12s ease;
 }
 .act .codicon { font-size: 20px; color: inherit; }
+/* 图标只有三种状态：静默 / 悬停 / 开启。
+   侧栏收起不再压暗图标——它是把侧栏叫回来的唯一入口，
+   变暗会被读成“已禁用”，而且收起本身已经由布局说明了。 */
 .act:hover { opacity: 1; background: var(--hover); }
 .act.active { opacity: 1; border-left-color: var(--accent); }
-/* 侧栏收起时把 Hosts 图标压暗，作为“已隐藏”的提示 */
-.act[aria-expanded="false"] { opacity: .4; }
+.act:focus-visible { outline: 1px solid var(--accent); outline-offset: -4px; }
 
 .sidebar {
   width: 230px; flex: 0 0 230px;
