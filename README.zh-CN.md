@@ -191,8 +191,8 @@ projects:
 | 存在 | 以它为准，并覆盖项目内 `deploy/ssh_config` |
 | 不存在 | 用项目内 `deploy/ssh_config` 初始化它（`~/.ssh` 0700，文件 0600） |
 
-`deploy/deploy_one.sh` 遵循同样的优先级，所以 GUI 和命令行看到的 Host 始终一致。
-需要时可用 `DEPLOY_SSH_CONFIG=/path/to/config` 显式指定。
+`deploy/deploy_one.sh` 直接用 `deploy_core.py` 解析 Host（规则只有一份实现），
+所以 GUI 和命令行不可能走偏。需要时可用 `DEPLOY_SSH_CONFIG=/path/to/config` 显式指定。
 
 ## 命令行
 
@@ -233,8 +233,7 @@ SCPro/
 ├── docs/                    # 截图、社交预览、打包说明
 ├── deploy/
 │   ├── deploy_one.sh        # 部署引擎
-│   ├── name_suffix.sh       # 公共后缀规则
-│   ├── local_src.sh         # 公共源码路径规则
+│   ├── resolve.py           # shell 适配层：复用 deploy_core 的规则，不重写一遍
 │   ├── rsync_progress.py    # 大文件进度
 │   └── *.example.*          # 配置模板（本地副本已被 gitignore）
 ├── logs/                    # 运行日志，保留最近 30 份
@@ -253,6 +252,9 @@ SCPro/
 ## 开发
 
 - `./main.py --check` 打印解析后的 Host / 项目，排查 YAML 很方便。
+- **部署规则只有一份实现**：Host 解析、ignore 过滤、端口覆盖、排除模板展开、
+  目录后缀、源码路径全在 `deploy_core.py`；`deploy/deploy_one.sh` 通过
+  `deploy/resolve.py` 复用，不要在 shell 里再写一份。
 - 日志写到 `logs/scpro_<时间戳>.log`，自动只保留最近 30 份。
 - 没有构建步骤：改完 `web/*` 重启应用即可。
 - JS → Python 走 `scpro://` 导航协议，Python → JS 用 `runJavaScript`；

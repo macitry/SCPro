@@ -45,8 +45,14 @@ def _is_portable() -> bool:
 
 PORTABLE = _is_portable()
 
+# 配置目录：deploy/deploy_one.sh 与 GUI 都会把生效目录通过 SCPRO_CONFIG_DIR
+# 显式传进来，保证命令行和界面读到的是同一份配置。
+_CONFIG_DIR_ENV = os.environ.get("SCPRO_CONFIG_DIR", "").strip()
+
 # 可写目录：配置 / 状态 / 缓存
-CONFIG_DIR = DEPLOY_DIR if PORTABLE else _env_path("XDG_CONFIG_HOME", "~/.config") / "scpro"
+CONFIG_DIR = (Path(_CONFIG_DIR_ENV).expanduser() if _CONFIG_DIR_ENV
+              else DEPLOY_DIR if PORTABLE
+              else _env_path("XDG_CONFIG_HOME", "~/.config") / "scpro")
 STATE_DIR = (APP_ROOT / "logs") if PORTABLE else (
     _env_path("XDG_STATE_HOME", "~/.local/state") / "scpro" / "logs")
 CACHE_DIR = (APP_ROOT / "upload_tmp") if PORTABLE else (
@@ -163,7 +169,7 @@ def workspace_root() -> Path:
 
     优先级：环境变量 DEPLOY_WORKSPACE_ROOT > deploy_config.yaml 的
     workspace_root > app 目录的上一级。支持 ~ 与绝对路径。
-    与 deploy/local_src.sh 的 resolve_workspace_root 保持同一规则。
+    deploy_one.sh 通过 deploy/resolve.py 复用这里的实现，规则只有这一份。
     """
     raw = os.environ.get("DEPLOY_WORKSPACE_ROOT", "").strip()
     if not raw:
@@ -451,7 +457,10 @@ def reorder_projects(order: List[str]) -> None:
 # Host
 # ==========================================================================
 def ssh_config_source() -> Path:
-    """当前生效的 SSH 配置：系统 ~/.ssh/config 优先，缺失时用项目自带副本。"""
+    """当前生效的 SSH 配置：DEPLOY_SSH_CONFIG > ~/.ssh/config > 项目自带副本。"""
+    override = os.environ.get("DEPLOY_SSH_CONFIG", "").strip()
+    if override:
+        return Path(override).expanduser()
     return SSH_SOURCE_CONFIG if SSH_SOURCE_CONFIG.exists() else SSH_CONFIG
 
 

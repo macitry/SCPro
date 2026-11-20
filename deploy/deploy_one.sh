@@ -27,6 +27,9 @@
 #
 # SSH 配置来源: ~/.ssh/config 优先，缺失时用本目录的 ssh_config；
 #               环境变量 DEPLOY_SSH_CONFIG 可显式指定。
+#
+# 解析规则（Host / 端口覆盖 / 排除模板 / 后缀 / 源码路径）只在 ../deploy_core.py
+# 实现一次，本脚本通过 resolve.py 复用，请勿在 shell 里再写一份。
 #===============================================================================
 
 set -euo pipefail
@@ -53,9 +56,6 @@ mkdir -p "$CONFIG_DIR"
 
 PROJECTS_YAML="${CONFIG_DIR}/projects.yaml"
 DEPLOY_YAML="${CONFIG_DIR}/deploy_config.yaml"
-SECRETS_YAML="${CONFIG_DIR}/deploy_secrets.yaml"
-CONNECTIONS_YAML="${CONFIG_DIR}/robot_connections.yaml"
-SSH_CONFIG="${CONFIG_DIR}/ssh_config"
 
 # 本地打包缓存
 if [[ -n "${SCPRO_UPLOAD_DIR:-}" ]]; then
@@ -89,21 +89,9 @@ unset _pair _name _example
 export SCPRO_CONFIG_DIR="$CONFIG_DIR"
 export SCPRO_PORTABLE="$PORTABLE"
 
-# SSH 配置来源：~/.ssh/config 优先，缺失时用配置目录里的副本
-#（DEPLOY_SSH_CONFIG 可显式指定，用于测试或特殊环境）
-if [[ -n "${DEPLOY_SSH_CONFIG:-}" ]]; then
-    SSH_CONFIG="$DEPLOY_SSH_CONFIG"
-elif [[ -f "${HOME}/.ssh/config" ]]; then
-    SSH_CONFIG="${HOME}/.ssh/config"
-fi
-
-# shellcheck source=name_suffix.sh
-source "${SCRIPT_DIR}/name_suffix.sh"
-# shellcheck source=local_src.sh
-source "${SCRIPT_DIR}/local_src.sh"
-
-# 本地源码相对路径的基准目录（deploy_config.yaml 的 workspace_root）
-WORKSPACE_DIR="$(resolve_workspace_root)"
+# 解析规则（Host / 端口覆盖 / 排除模板 / 后缀 / 源码路径）只在 deploy_core.py
+# 里实现一次；resolve.py 把结果转成 shell 能 eval 的 KEY=value，不重复规则。
+RESOLVE_PY="${SCRIPT_DIR}/resolve.py"
 
 _yaml_guard() {
     if [[ ! -f "$PROJECTS_YAML" ]]; then
@@ -117,175 +105,21 @@ _yaml_guard() {
 }
 
 #===============================================================================
-# Host 发现 + 项目规则解析（全部在一个 python 块里做，避免多处重复实现）
+# Host 发现 + 项目规则解析
+#   规则只在 deploy_core.py 里实现一次，这里只转调 resolve.py。
 #===============================================================================
 _hosts_and_project() {
     _yaml_guard || return 1
-    python3 - "$PROJECTS_YAML" "$SSH_CONFIG" "$SECRETS_YAML" "$CONNECTIONS_YAML" \
-             "${1:-}" "${2:-}" <<'PYEOF'
-import fnmatch
-import shlex
-import sys
-import yaml
-
-projects_file, ssh_file, secrets_file, conns_file, project, host = sys.argv[1:7]
-
-def load(path):
-    try:
-        with open(path, encoding="utf-8") as fh:
-            return yaml.safe_load(fh) or {}
-    except FileNotFoundError:
-        return {}
-
-cfg = load(projects_file)
-host_cfg = cfg.get("hosts") or {}
-ignore = [str(x) for x in (host_cfg.get("ignore") or [])]
-port_overrides = {str(k): str(v) for k, v in (host_cfg.get("ports") or {}).items()}
-profiles = cfg.get("exclude_profiles") or {}
-projects = cfg.get("projects") or {}
-
-# --- 解析 deploy/ssh_config: 别名 -> user/hostname/port ---
-hosts = {}
-current = []
-for raw in open(ssh_file, encoding="utf-8"):
-    line = raw.split("#", 1)[0].strip()
-    if not line:
-        continue
-    parts = line.split(None, 1)
-    if len(parts) < 2:
-        continue
-    key, val = parts[0].lower(), parts[1].strip()
-    if key == "host":
-        current = val.split()
-        for alias in current:
-            hosts.setdefault(alias, {})
-    elif key in ("hostname", "user", "port") and current:
-        for alias in current:
-            hosts[alias].setdefault(key, val)
-
-for alias, opts in hosts.items():
-    if alias in port_overrides:
-        opts["port"] = port_overrides[alias]
-
-def ignored(alias):
-    return any(fnmatch.fnmatchcase(alias, pat) for pat in ignore)
-
-def secret_for(alias):
-    secrets = load(secrets_file).get("secrets") or {}
-    if alias in secrets:
-        return str(secrets.get(alias) or "")
-    # 兼容老配置：robot_connections.yaml 里 ssh_host=<别名> 的键就是密码表的键
-    for key, val in (load(conns_file).get("connections") or {}).items():
-        if isinstance(val, dict) and str(val.get("ssh_host") or "") == alias:
-            return str(secrets.get(key) or "")
-    return ""
-
-if project == "--list-hosts" or (project == "" and host == "--list-hosts"):
-    for alias in sorted(hosts):
-        if ignored(alias):
-            continue
-        o = hosts[alias]
-        user = o.get("user", "")
-        name = o.get("hostname", "")
-        port = o.get("port", "22")
-        print("%s|%s@%s:%s" % (alias, user, name, port))
-    sys.exit(0)
-
-if project == "--list-tasks":
-    if host not in hosts or ignored(host):
-        sys.stderr.write("[ERROR] 未知或已忽略的 Host: %s\n" % host)
-        sys.exit(3)
-    for name, pcfg in projects.items():
-        matched = None
-        for candidate in (pcfg or {}).get("targets") or []:
-            if isinstance(candidate, dict) and candidate.get("match") \
-                    and fnmatch.fnmatchcase(host, str(candidate["match"])):
-                matched = candidate
-                break
-        if matched is None:
-            print("%s||||" % name)
-            continue
-        print("%s|%s|%s|%s" % (
-            name,
-            str(matched.get("base") or ""),
-            str(matched.get("subdir") or "."),
-            str((pcfg or {}).get("remote_name") or ""),
-        ))
-    sys.exit(0)
-
-if project not in projects:
-    sys.stderr.write("[ERROR] 未知项目: %s\n[提示]  可用项目: %s\n"
-                     % (project, ", ".join(projects) or "（无）"))
-    sys.exit(3)
-
-if host not in hosts or ignored(host):
-    sys.stderr.write("[ERROR] 未知或已忽略的 Host: %s\n[提示]  可用 Host: %s\n"
-                     % (host, ", ".join(a for a in sorted(hosts) if not ignored(a))))
-    sys.exit(3)
-
-pcfg = projects.get(project) or {}
-local_src = str(pcfg.get("local_src") or "").strip()
-if not local_src:
-    sys.stderr.write("[ERROR] 项目 %s 没有配置 local_src\n" % project)
-    sys.exit(3)
-remote_name = str(pcfg.get("remote_name") or "").strip() or local_src.rstrip("/").rsplit("/", 1)[-1]
-
-rule = None
-for candidate in pcfg.get("targets") or []:
-    if not isinstance(candidate, dict):
-        continue
-    match = str(candidate.get("match") or "")
-    if match and fnmatch.fnmatchcase(host, match):
-        rule = candidate
-        break
-if rule is None:
-    sys.stderr.write("[ERROR] 项目 %s 没有匹配 Host %s 的 targets 规则\n" % (project, host))
-    sys.exit(4)
-
-# 排除项
-raw_ex = pcfg.get("excludes")
-excludes = []
-if isinstance(raw_ex, str):
-    if raw_ex not in profiles:
-        sys.stderr.write("[ERROR] 未知排除模板: %s\n" % raw_ex)
-        sys.exit(3)
-    excludes = [str(x) for x in (profiles.get(raw_ex) or [])]
-elif isinstance(raw_ex, dict):
-    use = raw_ex.get("use")
-    if use:
-        if use not in profiles:
-            sys.stderr.write("[ERROR] 未知排除模板: %s\n" % use)
-            sys.exit(3)
-        excludes = [str(x) for x in (profiles.get(use) or [])]
-    for extra in (raw_ex.get("add") or []):
-        if str(extra) not in excludes:
-            excludes.append(str(extra))
-    for drop in (raw_ex.get("remove") or []):
-        if str(drop) in excludes:
-            excludes.remove(str(drop))
-elif isinstance(raw_ex, list):
-    excludes = [str(x) for x in raw_ex]
-
-opts = hosts[host]
-print("P_LOCAL_SRC=%s" % shlex.quote(local_src))
-print("P_REMOTE_NAME=%s" % shlex.quote(remote_name))
-print("P_EXCLUDES=%s" % shlex.quote(" ".join(shlex.quote(x) for x in excludes)))
-print("H_ALIAS=%s" % shlex.quote(host))
-print("H_USER=%s" % shlex.quote(opts.get("user", "")))
-print("H_HOSTNAME=%s" % shlex.quote(opts.get("hostname", "")))
-print("H_PORT=%s" % shlex.quote(opts.get("port", "22")))
-print("H_SECRET=%s" % shlex.quote(secret_for(host)))
-print("R_BASE=%s" % shlex.quote(str(rule.get("base") or "")))
-print("R_SUBDIR=%s" % shlex.quote(str(rule.get("subdir") or ".")))
-print("R_MATCH=%s" % shlex.quote(str(rule.get("match") or "")))
-PYEOF
+    # 后缀规则也只在 deploy_core 里，用环境变量把它交给子进程
+    export DEPLOY_NAME_SUFFIX="${DEPLOY_NAME_SUFFIX:-}"
+    python3 "$RESOLVE_PY" "$@"
 }
 
 print_help() {
     sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     echo ""
     echo "可用 Host:"
-    _hosts_and_project --list-hosts "" | sed 's/^/  - /'
+    _hosts_and_project --list-hosts | sed 's/^/  - /'
 }
 
 #===============================================================================
@@ -337,7 +171,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$LIST_HOSTS" == true ]]; then
-    _hosts_and_project --list-hosts ""
+    _hosts_and_project --list-hosts
     exit 0
 fi
 
@@ -364,12 +198,18 @@ if [[ -z "$HOST" ]]; then
     exit 1
 fi
 
-VARS="$(_hosts_and_project "$PROJECT" "$HOST")" || exit $?
+RESOLVE_ARGS=("$PROJECT" "$HOST")
+if [[ -n "$SRC_ARG" ]]; then
+    RESOLVE_ARGS+=(--src "$SRC_ARG")
+fi
+VARS="$(_hosts_and_project "${RESOLVE_ARGS[@]}")" || exit $?
+unset RESOLVE_ARGS
 eval "$VARS"
 
-NAME_SUFFIX="$(resolve_name_suffix)"
+NAME_SUFFIX="$P_NAME_SUFFIX"
+SRC_DIR="$P_SRC_DIR"
+WORKSPACE_DIR="$P_WORKSPACE_DIR"
 LOCAL_PKG_DIR="${DST_ARG:-${UPLOAD_TMP_DIR}/${P_REMOTE_NAME}${NAME_SUFFIX}}"
-SRC_DIR="$(resolve_local_src "${SRC_ARG:-${DEPLOY_LOCAL_SRC:-$P_LOCAL_SRC}}" || true)"
 [[ -n "$SRC_DIR" ]] || { echo "[ERROR] 无法解析本地源码目录: ${P_LOCAL_SRC}" >&2; exit 1; }
 
 EXCLUDES=()

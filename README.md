@@ -210,8 +210,8 @@ Clicking the refresh button in the header:
 | exists | Used as the source of truth, then copied to `deploy/ssh_config` |
 | missing | `deploy/ssh_config` initializes it (`~/.ssh` 0700, file 0600) |
 
-`deploy/deploy_one.sh` follows the same priority, so the GUI and CLI always agree.
-Override with `DEPLOY_SSH_CONFIG=/path/to/config` if needed.
+`deploy/deploy_one.sh` resolves hosts through `deploy_core.py` itself, so the GUI and
+CLI cannot drift apart. Override with `DEPLOY_SSH_CONFIG=/path/to/config` if needed.
 
 ## Command line
 
@@ -252,8 +252,7 @@ SCPro/
 ├── docs/                    # screenshots, social card, packaging guide
 ├── deploy/
 │   ├── deploy_one.sh        # deployment engine
-│   ├── name_suffix.sh       # shared suffix rules
-│   ├── local_src.sh         # shared source path rules
+│   ├── resolve.py           # shell adapter: reuse deploy_core rules, no duplicates
 │   ├── rsync_progress.py    # big-file progress for rsync
 │   └── *.example.*          # config templates (local copies are gitignored)
 ├── logs/                    # runtime logs, last 30 kept
@@ -273,6 +272,10 @@ SCPro/
 ## Development
 
 - `./main.py --check` prints the resolved host/project state — handy for debugging YAML.
+- **Deployment rules live in exactly one place**: host parsing, ignore filtering, port
+  overrides, exclude-template expansion, name suffix and source paths are all in
+  `deploy_core.py`. `deploy/deploy_one.sh` reuses them through `deploy/resolve.py`
+  instead of keeping a second copy.
 - Logs are written to `logs/scpro_<timestamp>.log` and rotated to the last 30 files.
 - There is no build step: edit `web/*` and restart the app.
 - JS → Python uses the `scpro://` navigation scheme; Python → JS uses `runJavaScript`.
