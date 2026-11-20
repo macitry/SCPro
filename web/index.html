@@ -61,18 +61,54 @@
         <button id="btn-dismiss-summary" class="icon">✕</button>
       </div>
 
-      <div class="list-head">
-        <span class="c-check"></span>
-        <span class="c-main project-heading">
-          <span data-i18n="col.project_route">项目 / 部署路径</span>
-          <input id="project-search" type="search" data-i18n-placeholder="project.search"
-                 placeholder="搜索项目…" autocomplete="off">
-          <button id="btn-new" class="mini" data-i18n-title="btn.new" title="新建项目">＋</button>
-        </span>
-        <span class="c-act" data-i18n="col.actions">操作</span>
+      <div class="ws">
+        <section class="ws-list">
+          <div class="ws-head">
+            <span data-i18n="ws.title">工作台</span>
+            <span id="ws-count" class="ws-count"></span>
+            <div class="flex1"></div>
+            <button id="btn-library" class="icon" data-i18n-title="ws.add" title="添加项目">＋</button>
+            <button id="btn-new" class="icon" data-i18n-title="btn.new" title="新建项目">✎</button>
+          </div>
+          <div class="ws-search">
+            <input id="ws-search" type="search" data-i18n-placeholder="ws.search"
+                   placeholder="搜索工作台…" autocomplete="off">
+          </div>
+          <div id="ws-items" class="ws-items"></div>
+        </section>
+
+        <section class="ws-detail">
+          <div id="ws-empty" class="ws-empty">
+            <span class="codicon codicon-files ws-empty-icon"></span>
+            <b data-i18n="ws.empty_title">工作台还是空的</b>
+            <span data-i18n="ws.empty_body">从项目库挑几个常用的项目放进来</span>
+            <button id="btn-open-library" class="btn primary" data-i18n="ws.open_library">打开项目库</button>
+          </div>
+          <div id="ws-detail" class="ws-detail-body hidden"></div>
+        </section>
       </div>
-      <div id="project-list" class="project-list"></div>
     </main>
+  </div>
+
+  <div id="library" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-mask" id="lib-mask"></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true">
+      <header class="drawer-head">
+        <span class="drawer-title" data-i18n="lib.title">项目库</span>
+        <span id="lib-total" class="ws-count"></span>
+        <div class="flex1"></div>
+        <input id="lib-search" type="search" data-i18n-placeholder="lib.search"
+               placeholder="搜索项目…" autocomplete="off">
+        <button id="lib-close" class="icon" data-i18n-title="btn.close" title="关闭">✕</button>
+      </header>
+      <div id="lib-filters" class="lib-filters"></div>
+      <div id="lib-grid" class="lib-grid"></div>
+      <footer class="drawer-foot">
+        <span id="lib-selected-count" class="muted"></span>
+        <div class="flex1"></div>
+        <button id="lib-add" class="btn primary" disabled></button>
+      </footer>
+    </aside>
   </div>
 
   <section class="panel" id="panel" aria-hidden="false">

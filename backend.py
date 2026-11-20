@@ -38,6 +38,14 @@ def snapshot() -> dict:
                        if host_info else ""),
             "error": project.error,
             "match": (rule or {}).get("match", ""),
+            # 工作台详情区需要的字段
+            "remote_name": project.remote_name,
+            "excludes": list(project.excludes),
+            "rule": ({
+                "match": rule.get("match", ""),
+                "base": rule.get("base", ""),
+                "subdir": rule.get("subdir", "."),
+            } if rule else None),
         })
     return {
         "current_host": current,

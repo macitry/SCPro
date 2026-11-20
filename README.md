@@ -52,11 +52,15 @@ ritual for every board. SCPro turns that into: **pick a host, tick projects, upl
   online/offline status
 - Add or remove hosts from the sidebar; changes go to `~/.ssh/config` with a `.bak`
   backup and are mirrored to the project copy
-- Project selections are remembered per host; switching back restores them
+- A project library shows every project as a card grid, with search and
+  "in workspace / with errors / no rule" filters
+- The workspace keeps only the projects you care about: a compact 32 px list on the
+  left, a detail pane on the right showing local source, remote path, matched host rule
+  and excludes — twice as many projects fit on screen as in the old layout
 - Wildcard target rules per project, with a hit preview in the editor
 - HTML project editor: local source picker, remote directory name, ordered host rules,
   exclude profiles and a lazily expanded exclusion tree
-- Drag to reorder projects; search projects and hosts; selection is remembered across
+- Drag to reorder the workspace; the selection and active project are remembered across
   restarts
 
 **Plugins**

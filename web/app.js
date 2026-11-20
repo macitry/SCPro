@@ -4,8 +4,10 @@ const state = {
   hosts: [],
   projects: [],
   currentHost: "",
-  selected: new Set(),
-  selectedByHost: {},
+  workspace: [],          // 工作台项目 id（全局，顺序即展示顺序）
+  activeProject: "",      // 详情区当前项目
+  selected: new Set(),    // 工作台里勾选待上传的项目
+  selectedByHost: {},     // 旧设置兼容，不再写入
   running: false,
   assets: {},
   hostQuery: "",
@@ -13,6 +15,14 @@ const state = {
   lang: "zh",
   failed: [],
   deleteRemote: false,
+};
+
+// 项目库抽屉（右侧滑出）
+const library = {
+  open: false,
+  query: "",
+  filter: "all",          // all | added | error | norule
+  selection: new Set(),
 };
 
 let panelHeight = 228;
@@ -43,13 +53,12 @@ const I18N = {
     "row.no_rule": "— 该 Host 无对应规则",
     "act.edit": "编辑…",
     "act.copy": "复制项目", "act.delete": "删除项目",
-    "btn.new": "＋ 新建项目", "btn.passwords": "密码",
+    "btn.new": "新建项目", "btn.passwords": "密码",
     "btn.test": "测试连接", "btn.run": "上传选中", "btn.run_n": "上传选中（%d）",
     "btn.test_short": "测试", "menu.more": "更多操作",
     "btn.cancel": "取消", "btn.ok": "确定", "btn.save": "保存",
-    "col.project_route": "项目 / 部署路径", "col.actions": "操作",
     "route.local": "本地", "route.remote": "远端",
-    "project.search": "搜索项目…", "project.empty": "没有匹配的项目",
+    "project.empty": "没有匹配的项目",
     "panel.output": "输出", "panel.search": "筛选日志…",
     "panel.show": "显示输出", "panel.hide": "隐藏输出",
     "filter.all": "全部", "filter.problem": "只看问题",
@@ -102,6 +111,31 @@ const I18N = {
     "msg.upload_body": "将 %d 个项目上传到：%s\n\n项目会逐个打包并同步，执行过程中不能切换 Host。",
     "msg.delete_on": "远端清理：已开启，将删除目标目录中本地包不存在的文件。",
     "msg.delete_off": "远端清理：未开启，目标目录中的多余文件会保留。",
+    "ws.title": "工作台",
+    "ws.search": "搜索工作台…",
+    "ws.add": "添加项目",
+    "ws.remove": "移出工作台",
+    "ws.open_library": "打开项目库",
+    "ws.empty_title": "工作台还是空的",
+    "ws.empty_body": "从项目库挑几个常用的项目放进来",
+    "ws.list_empty": "还没有项目，点右上角 ＋ 从项目库添加",
+    "ws.detail.local": "本地源码",
+    "ws.detail.remote": "远端路径",
+    "ws.detail.rule": "匹配规则",
+    "ws.detail.excludes": "排除项",
+    "btn.upload_one": "上传",
+    "btn.close": "关闭",
+    "lib.title": "项目库",
+    "lib.search": "搜索项目…",
+    "lib.count": "%d 个",
+    "lib.selected": "已选 %d 个",
+    "lib.add_selected": "添加所选 (%d)",
+    "lib.filter.all": "全部",
+    "lib.filter.added": "已在工作台",
+    "lib.filter.error": "有错误",
+    "lib.filter.norule": "无规则",
+    "toast.ws_added": "已加入工作台",
+    "toast.ws_removed": "已移出工作台",
     "msg.warning_prefix": "\n\n注意：\n",
   },
   en: {
@@ -128,13 +162,12 @@ const I18N = {
     "row.no_rule": "— no rule for this Host",
     "act.edit": "Edit…",
     "act.copy": "Duplicate project", "act.delete": "Delete project",
-    "btn.new": "＋ New project", "btn.passwords": "Passwords",
+    "btn.new": "New project", "btn.passwords": "Passwords",
     "btn.test": "Test connection", "btn.run": "Upload selected", "btn.run_n": "Upload selected (%d)",
     "btn.test_short": "Test", "menu.more": "More actions",
     "btn.cancel": "Cancel", "btn.ok": "OK", "btn.save": "Save",
-    "col.project_route": "Project / Deployment path", "col.actions": "Actions",
     "route.local": "Local", "route.remote": "Remote",
-    "project.search": "Search projects…", "project.empty": "No matching projects",
+    "project.empty": "No matching projects",
     "panel.output": "Output", "panel.search": "Filter log…",
     "panel.show": "Show output", "panel.hide": "Hide output",
     "filter.all": "All", "filter.problem": "Problems",
@@ -187,6 +220,31 @@ const I18N = {
     "msg.upload_body": "Upload %d project(s) to: %s\n\nProjects are packed and synced one by one; the Host is locked while running.",
     "msg.delete_on": "Remote cleanup is ON: files not present in the local package will be deleted.",
     "msg.delete_off": "Remote cleanup is OFF: extra files in the destination will be preserved.",
+    "ws.title": "Workspace",
+    "ws.search": "Search workspace…",
+    "ws.add": "Add project",
+    "ws.remove": "Remove from workspace",
+    "ws.open_library": "Open project library",
+    "ws.empty_title": "Your workspace is empty",
+    "ws.empty_body": "Pick a few projects from the library to get started",
+    "ws.list_empty": "No projects yet — click ＋ to add from the library",
+    "ws.detail.local": "Local source",
+    "ws.detail.remote": "Remote path",
+    "ws.detail.rule": "Matched rule",
+    "ws.detail.excludes": "Excludes",
+    "btn.upload_one": "Upload",
+    "btn.close": "Close",
+    "lib.title": "Project library",
+    "lib.search": "Search projects…",
+    "lib.count": "%d total",
+    "lib.selected": "%d selected",
+    "lib.add_selected": "Add selected (%d)",
+    "lib.filter.all": "All",
+    "lib.filter.added": "In workspace",
+    "lib.filter.error": "With errors",
+    "lib.filter.norule": "No rule",
+    "toast.ws_added": "Added to workspace",
+    "toast.ws_removed": "Removed from workspace",
     "msg.warning_prefix": "\n\nNote:\n",
   },
 };
@@ -237,45 +295,21 @@ function el(tag, cls, text) {
 }
 
 window.scproState = function (payload) {
-  const previousHost = state.currentHost || "";
-  const nextHost = payload.current_host || "";
   state.hosts = payload.hosts || [];
   state.projects = payload.projects || [];
+  state.currentHost = payload.current_host || "";
 
-  // 切走之前，把当前 Host 的勾选记下来
-  if (previousHost && previousHost !== nextHost) {
-    state.selectedByHost[previousHost] = [...state.selected];
+  // 工作台里的项目可能已被删除：渲染前剔除失效 id
+  const known = new Set(state.projects.map(project => project.id));
+  const before = state.workspace.length;
+  state.workspace = state.workspace.filter(id => known.has(id));
+  // 上传勾选必须是工作台的子集，否则会出现“勾了但看不见”的项目
+  const inWorkspace = new Set(state.workspace);
+  state.selected = new Set([...state.selected].filter(id => inWorkspace.has(id)));
+  if (!known.has(state.activeProject)) {
+    state.activeProject = state.workspace[0] || "";
   }
-  state.currentHost = nextHost;
-
-  const usable = new Set(state.projects
-    .filter(p => p.remote && !p.error)
-    .map(p => p.id));
-  if (nextHost !== previousHost) {
-    const remembered = state.selectedByHost[nextHost];
-    if (Array.isArray(remembered)) {
-      state.selected = new Set(remembered);
-    } else if (previousHost) {
-      // 首次去某个 Host：不继承上一个 Host 的勾选
-      state.selected = new Set();
-    }
-  }
-
-  const before = state.selected.size;
-  state.selected = new Set([...state.selected].filter(id => usable.has(id)));
-  const dropped = before - state.selected.size;
-  const hostChanged = previousHost !== nextHost;
-  if (nextHost) state.selectedByHost[nextHost] = [...state.selected];
-  if (hostChanged || dropped > 0) {
-    send("save-ui", {
-      panel_h: panelHeight,
-      selected: [...state.selected],
-      selected_by_host: state.selectedByHost,
-    });
-    if (dropped > 0) {
-      window.scproToast(t("toast.selection_dropped", dropped));
-    }
-  }
+  if (state.workspace.length !== before) saveWorkspace();
   render();
 };
 
@@ -310,6 +344,12 @@ window.scproUi = function (payload) {
   }
   if (payload && Array.isArray(payload.selected)) {
     state.selected = new Set(payload.selected);
+  }
+  if (payload && Array.isArray(payload.workspace)) {
+    state.workspace = payload.workspace.map(String);
+  }
+  if (payload && typeof payload.workspace_active === "string") {
+    state.activeProject = payload.workspace_active;
   }
 };
 
@@ -544,133 +584,337 @@ function render() {
     list.appendChild(row);
   });
 
-  const box = document.getElementById("project-list");
-  const projectScrollTop = box.scrollTop;
-  box.innerHTML = "";
-  const projectQuery = state.projectQuery.trim().toLowerCase();
-  const filteredProjects = state.projects.filter(p => {
-    if (!projectQuery) return true;
-    return [p.id, p.remote, p.local_src, p.error]
-      .some(value => String(value || "").toLowerCase().includes(projectQuery));
-  });
-  box.ondragover = (e) => { if (dragProjectId && !projectQuery) e.preventDefault(); };
-  box.ondrop = (e) => {
-    if (e.target !== box || !dragProjectId || projectQuery) return;
-    e.preventDefault();
-    const order = state.projects.map(p => p.id).filter(id => id !== dragProjectId);
-    order.push(dragProjectId);
-    dragProjectId = null;
-    send("reorder-projects", {order});
-  };
-  filteredProjects.forEach(p => {
-    const disabled = !!p.error || !p.remote;
-    const row = el("div", "project" + (p.error ? " error" : "") + (disabled ? " disabled" : ""));
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.checked = state.selected.has(p.id);
-    // 已被选中的项目即使在当前 Host 下不可用，也允许取消勾选
-    check.disabled = disabled && !check.checked;
-    check.onchange = () => {
-      if (check.checked) state.selected.add(p.id); else state.selected.delete(p.id);
-      if (state.currentHost) {
-        state.selectedByHost[state.currentHost] = [...state.selected];
-      }
-      updateRunButton();
-      send("save-ui", {
-        panel_h: panelHeight,
-        selected: [...state.selected],
-        selected_by_host: state.selectedByHost,
-      });
-    };
-    row.appendChild(check);
-    const nameWrap = el("span", "name");
-    if (state.assets.folder) {
-      const img = document.createElement("img");
-      img.className = "file-icon";
-      img.src = state.assets.folder;
-      nameWrap.appendChild(img);
-    }
-    nameWrap.appendChild(el("span", "label", p.id));
-    const main = el("span", "project-main");
-    main.appendChild(nameWrap);
-    const route = el("span", "route");
-    const local = el("span", "route-path route-local");
-    local.title = p.local_src || "";
-    local.appendChild(el("span", "route-label", t("route.local")));
-    local.appendChild(el("span", "route-value", p.local_src || "—"));
-    const remoteValue = p.error || p.remote || t("row.no_rule");
-    const remote = el(
-      "span",
-      "route-path route-remote" + (disabled ? " invalid" : ""));
-    remote.title = remoteValue;
-    remote.appendChild(el("span", "route-label", t("route.remote")));
-    remote.appendChild(el("span", "route-value", remoteValue));
-    route.appendChild(local);
-    route.appendChild(el("span", "route-arrow", "→"));
-    route.appendChild(remote);
-    main.appendChild(route);
-    row.appendChild(main);
-    const actWrap = el("span", "pact");
-    const edit = el("button", "icon", t("act.edit"));
-    edit.disabled = state.running;
-    edit.onclick = () => send("edit-project", {name: p.id});
-    const more = el("button", "icon", "⋯");
-    more.title = t("menu.more");
-    more.disabled = state.running;
-    more.dataset.menuTrigger = "";
-    more.onclick = event => {
-      event.stopPropagation();
-      openContextMenu(more, [
-        {label: t("act.copy"), action: () => send("copy-project", {name: p.id})},
-        {
-          label: t("act.delete"),
-          danger: true,
-          action: () => showConfirm(
-            t("confirm.delete"), t("confirm.delete_body", p.id),
-            () => send("delete-project", {name: p.id}), t("confirm.delete")),
-        },
-      ]);
-    };
-    actWrap.appendChild(edit);
-    actWrap.appendChild(more);
-    row.appendChild(actWrap);
-    row.draggable = !state.running && !projectQuery;
-    row.ondragstart = (e) => {
-      dragProjectId = p.id;
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", p.id);
-      row.classList.add("dragging");
-    };
-    row.ondragover = (e) => {
-      if (dragProjectId && dragProjectId !== p.id && !projectQuery) {
-        e.preventDefault();
-        row.classList.add("drag-over");
-      }
-    };
-    row.ondragleave = () => row.classList.remove("drag-over");
-    row.ondrop = (e) => {
-      if (!dragProjectId || dragProjectId === p.id || projectQuery) return;
-      e.preventDefault();
-      row.classList.remove("drag-over");
-      const order = state.projects.map(item => item.id).filter(id => id !== dragProjectId);
-      order.splice(order.indexOf(p.id), 0, dragProjectId);
-      dragProjectId = null;
-      send("reorder-projects", {order});
-    };
-    row.ondragend = () => {
-      dragProjectId = null;
-      document.querySelectorAll(".dragging,.drag-over").forEach(node => {
-        node.classList.remove("dragging");
-        node.classList.remove("drag-over");
-      });
-    };
-    box.appendChild(row);
-  });
-  if (!filteredProjects.length) {
-    box.appendChild(el("div", "project-empty", t("project.empty")));
-  }
-  box.scrollTop = projectScrollTop;
+  renderWorkspace();
+  renderLibrary();
   updateRunButton();
+}
+
+/* ---------------- 工作台 ---------------- */
+function workspaceProjects() {
+  const byId = new Map(state.projects.map(project => [project.id, project]));
+  return state.workspace.map(id => byId.get(id)).filter(Boolean);
+}
+
+function projectUsable(project) {
+  return !!project && !!project.remote && !project.error;
+}
+
+function renderWorkspace() {
+  const items = workspaceProjects();
+  document.getElementById("ws-count").textContent =
+    items.length + "/" + state.projects.length;
+  const box = document.getElementById("ws-items");
+  box.innerHTML = "";
+  const query = state.projectQuery.trim().toLowerCase();
+  const visible = items.filter(project => {
+    if (!query) return true;
+    return [project.id, project.remote, project.local_src, project.error]
+      .some(value => String(value || "").toLowerCase().includes(query));
+  });
+  visible.forEach(project => box.appendChild(workspaceRow(project)));
+  if (!items.length) {
+    box.appendChild(el("div", "ws-hint", t("ws.list_empty")));
+  } else if (!visible.length) {
+    box.appendChild(el("div", "ws-hint", t("project.empty")));
+  }
+  renderDetail();
+}
+
+function workspaceRow(project) {
+  const usable = projectUsable(project);
+  const row = el("div", "ws-row"
+    + (project.id === state.activeProject ? " active" : "")
+    + (usable ? "" : " disabled"));
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.checked = state.selected.has(project.id);
+  check.disabled = !usable && !check.checked;
+  check.onclick = event => event.stopPropagation();
+  check.onchange = () => {
+    if (check.checked) state.selected.add(project.id);
+    else state.selected.delete(project.id);
+    saveWorkspace();
+    updateRunButton();
+  };
+  row.appendChild(check);
+  row.appendChild(el("span", "dot " + (project.error ? "error"
+    : project.remote ? "online" : "unknown")));
+  row.appendChild(el("span", "ws-name", project.id));
+  row.title = project.error || project.remote || t("row.no_rule");
+  row.onclick = () => {
+    state.activeProject = project.id;
+    saveWorkspace();
+    renderWorkspace();
+  };
+  row.draggable = !state.running && !state.projectQuery;
+  row.ondragstart = event => {
+    dragProjectId = project.id;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", project.id);
+    row.classList.add("dragging");
+  };
+  row.ondragover = event => {
+    if (dragProjectId && dragProjectId !== project.id) {
+      event.preventDefault();
+      row.classList.add("drag-over");
+    }
+  };
+  row.ondragleave = () => row.classList.remove("drag-over");
+  row.ondrop = event => {
+    if (!dragProjectId || dragProjectId === project.id) return;
+    event.preventDefault();
+    row.classList.remove("drag-over");
+    const order = state.workspace.filter(id => id !== dragProjectId);
+    order.splice(order.indexOf(project.id), 0, dragProjectId);
+    dragProjectId = null;
+    state.workspace = order;
+    saveWorkspace();
+    renderWorkspace();
+  };
+  row.ondragend = () => {
+    dragProjectId = null;
+    document.querySelectorAll(".dragging,.drag-over").forEach(node => {
+      node.classList.remove("dragging");
+      node.classList.remove("drag-over");
+    });
+  };
+  return row;
+}
+
+function detailField(label, value, danger = false) {
+  const row = el("div", "field");
+  row.appendChild(el("span", "field-label", label));
+  const code = el("code", "field-value" + (danger ? " danger-text" : ""), value);
+  code.title = value;
+  row.appendChild(code);
+  return row;
+}
+
+function renderDetail() {
+  const empty = document.getElementById("ws-empty");
+  const body = document.getElementById("ws-detail");
+  const items = workspaceProjects();
+  const project = items.find(item => item.id === state.activeProject)
+    || items[0] || null;
+  if (!project) {
+    state.activeProject = "";
+    empty.classList.remove("hidden");
+    body.classList.add("hidden");
+    return;
+  }
+  state.activeProject = project.id;
+  empty.classList.add("hidden");
+  body.classList.remove("hidden");
+  body.innerHTML = "";
+
+  const head = el("div", "detail-head");
+  head.appendChild(el("span", "detail-title", project.id));
+  head.appendChild(el("span", "dot " + (project.error ? "error"
+    : project.remote ? "online" : "unknown")));
+  const more = el("button", "icon", "⋯");
+  more.title = t("menu.more");
+  more.disabled = state.running;
+  more.onclick = event => {
+    event.stopPropagation();
+    openContextMenu(more, [
+      {label: t("act.copy"), action: () => send("copy-project", {name: project.id})},
+      {
+        label: t("act.delete"),
+        danger: true,
+        action: () => showConfirm(
+          t("confirm.delete"), t("confirm.delete_body", project.id),
+          () => send("delete-project", {name: project.id}), t("confirm.delete")),
+      },
+    ]);
+  };
+  head.appendChild(more);
+  body.appendChild(head);
+
+  const fields = el("div", "detail-fields");
+  fields.appendChild(detailField(t("ws.detail.local"),
+    project.local_abs || project.local_src || "—"));
+  fields.appendChild(detailField(t("ws.detail.remote"),
+    project.error || project.remote || t("row.no_rule"),
+    !!project.error || !project.remote));
+  const rule = project.rule;
+  fields.appendChild(detailField(t("ws.detail.rule"), rule
+    ? rule.match + "  →  " + rule.base
+      + (rule.subdir && rule.subdir !== "." ? " / " + rule.subdir : "")
+    : t("row.no_rule")));
+  const excludes = project.excludes || [];
+  fields.appendChild(detailField(t("ws.detail.excludes"),
+    excludes.length ? excludes.join("  ") : "—"));
+  body.appendChild(fields);
+
+  const actions = el("div", "detail-actions");
+  const upload = el("button", "btn primary", t("btn.upload_one"));
+  upload.disabled = state.running || !projectUsable(project);
+  upload.onclick = () => send("preflight", {projects: [project.id]});
+  const edit = el("button", "btn", t("act.edit"));
+  edit.disabled = state.running;
+  edit.onclick = () => send("edit-project", {name: project.id});
+  const remove = el("button", "btn", t("ws.remove"));
+  remove.disabled = state.running;
+  remove.onclick = () => removeFromWorkspace(project.id);
+  actions.appendChild(upload);
+  actions.appendChild(edit);
+  actions.appendChild(remove);
+  body.appendChild(actions);
+}
+
+/* ---------------- 项目库抽屉 ---------------- */
+const LIBRARY_FILTERS = [
+  ["all", "lib.filter.all"],
+  ["added", "lib.filter.added"],
+  ["error", "lib.filter.error"],
+  ["norule", "lib.filter.norule"],
+];
+
+// 卡片只保留远端路径的最后两段（子目录 + 项目名），
+// 前面的 /home/robot/px_robot_code 之类是所有项目共有的前缀，没有信息量。
+function shortRemote(project) {
+  if (!project.remote) return project.error || t("row.no_rule");
+  const parts = project.remote.split("/").filter(Boolean);
+  return (parts.length > 2 ? "…/" : "/") + parts.slice(-2).join("/") + "/";
+}
+
+function renderLibrary() {
+  if (!library.open) return;
+  document.getElementById("lib-total").textContent =
+    t("lib.count", state.projects.length);
+
+  const filters = document.getElementById("lib-filters");
+  filters.innerHTML = "";
+  LIBRARY_FILTERS.forEach(([key, label]) => {
+    const chip = el("button", "chip" + (library.filter === key ? " active" : ""),
+                    t(label));
+    chip.onclick = () => { library.filter = key; renderLibrary(); };
+    filters.appendChild(chip);
+  });
+
+  const grid = document.getElementById("lib-grid");
+  grid.innerHTML = "";
+  const query = library.query.trim().toLowerCase();
+  const added = new Set(state.workspace);
+  const list = state.projects.filter(project => {
+    if (query) {
+      const hit = [project.id, project.remote, project.local_src, project.error]
+        .some(value => String(value || "").toLowerCase().includes(query));
+      if (!hit) return false;
+    }
+    if (library.filter === "added") return added.has(project.id);
+    if (library.filter === "error") return !!project.error;
+    if (library.filter === "norule") return !project.remote;
+    return true;
+  });
+  list.forEach(project => {
+    grid.appendChild(libraryCard(project, added.has(project.id)));
+  });
+  if (!list.length) grid.appendChild(el("div", "ws-hint", t("project.empty")));
+  updateLibraryFooter();
+}
+
+function libraryCard(project, isAdded) {
+  const usable = projectUsable(project);
+  const card = el("div", "lib-card"
+    + (isAdded ? " added" : "")
+    + (library.selection.has(project.id) ? " selected" : "")
+    + (usable ? "" : " disabled"));
+  const head = el("div", "lib-card-head");
+  head.appendChild(el("span", "lib-name", project.id));
+  const toggle = el("button", "lib-toggle", isAdded ? "✓" : "＋");
+  toggle.title = isAdded ? t("ws.remove") : t("ws.add");
+  toggle.disabled = !usable && !isAdded;
+  toggle.onclick = event => {
+    event.stopPropagation();
+    toggleWorkspace(project.id);
+  };
+  head.appendChild(toggle);
+  card.appendChild(head);
+  const path = el("div", "lib-path", shortRemote(project));
+  path.title = project.remote || shortRemote(project);
+  card.appendChild(path);
+  const meta = el("div", "lib-meta");
+  meta.appendChild(el("span", "dot " + (project.error ? "error"
+    : project.remote ? "online" : "unknown")));
+  meta.appendChild(el("span", "", project.error
+    || (project.remote ? (project.match || t("host.status_online"))
+                       : t("row.no_rule"))));
+  card.appendChild(meta);
+  card.onclick = () => {
+    if (library.selection.has(project.id)) library.selection.delete(project.id);
+    else library.selection.add(project.id);
+    renderLibrary();
+  };
+  card.ondblclick = () => {
+    if (isAdded || !usable) return;
+    addToWorkspace(project.id);
+    closeLibrary();
+  };
+  return card;
+}
+
+function updateLibraryFooter() {
+  const count = library.selection.size;
+  document.getElementById("lib-selected-count").textContent =
+    count ? t("lib.selected", count) : "";
+  const add = document.getElementById("lib-add");
+  add.textContent = t("lib.add_selected", count);
+  add.disabled = count === 0;
+}
+
+function openLibrary() {
+  library.open = true;
+  library.selection = new Set();
+  const node = document.getElementById("library");
+  node.classList.remove("hidden");
+  node.setAttribute("aria-hidden", "false");
+  renderLibrary();
+  const search = document.getElementById("lib-search");
+  search.value = library.query;
+  setTimeout(() => search.focus(), 0);
+}
+
+function closeLibrary() {
+  library.open = false;
+  library.selection = new Set();
+  const node = document.getElementById("library");
+  node.classList.add("hidden");
+  node.setAttribute("aria-hidden", "true");
+}
+
+function addToWorkspace(id) {
+  if (state.workspace.includes(id)) return;
+  state.workspace.push(id);
+  state.selected.add(id);
+  if (!state.activeProject) state.activeProject = id;
+  saveWorkspace();
+  render();
+  window.scproToast(t("toast.ws_added"));
+}
+
+function removeFromWorkspace(id) {
+  state.workspace = state.workspace.filter(item => item !== id);
+  state.selected.delete(id);
+  if (state.activeProject === id) state.activeProject = state.workspace[0] || "";
+  saveWorkspace();
+  render();
+  window.scproToast(t("toast.ws_removed"));
+}
+
+function toggleWorkspace(id) {
+  if (state.workspace.includes(id)) removeFromWorkspace(id);
+  else addToWorkspace(id);
+  if (library.open) renderLibrary();
+}
+
+function saveWorkspace() {
+  send("save-ui", {
+    panel_h: panelHeight,
+    workspace: state.workspace,
+    workspace_active: state.activeProject,
+    selected: [...state.selected],
+  });
 }
 
 function updateRunButton() {
@@ -1261,8 +1505,7 @@ function bind() {
         toggleHostSidebar();
       } else if (view === "projects") {
         setActivity("projects");
-        document.getElementById("project-list").scrollTop = 0;
-        document.getElementById("project-search").focus();
+        document.getElementById("ws-search").focus();
       }
     };
   });
@@ -1270,12 +1513,39 @@ function bind() {
 
   const search = document.getElementById("host-search");
   search.oninput = () => { state.hostQuery = search.value; render(); };
-  const projectSearch = document.getElementById("project-search");
-  projectSearch.oninput = () => {
-    state.projectQuery = projectSearch.value;
-    render();
-    projectSearch.focus();
+
+  const wsSearch = document.getElementById("ws-search");
+  wsSearch.oninput = () => {
+    state.projectQuery = wsSearch.value;
+    renderWorkspace();
+    wsSearch.focus();
   };
+
+  document.getElementById("btn-library").onclick = openLibrary;
+  document.getElementById("btn-open-library").onclick = openLibrary;
+  document.getElementById("lib-close").onclick = closeLibrary;
+  document.getElementById("lib-mask").onclick = closeLibrary;
+  document.getElementById("lib-search").oninput = event => {
+    library.query = event.target.value;
+    renderLibrary();
+  };
+  document.getElementById("lib-add").onclick = () => {
+    [...library.selection].forEach(id => {
+      if (state.workspace.includes(id)) return;
+      state.workspace.push(id);
+      state.selected.add(id);
+    });
+    if (!state.activeProject) state.activeProject = state.workspace[0] || "";
+    library.selection = new Set();
+    saveWorkspace();
+    render();
+  };
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && library.open) {
+      closeLibrary();
+      event.preventDefault();
+    }
+  });
 
   // 日志面板拖动高度
   const resizer = document.getElementById("panel-resizer");

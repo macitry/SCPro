@@ -65,6 +65,8 @@ def load_app_settings() -> dict:
         "theme_id": "",
         "selected": [],
         "selected_by_host": {},
+        "workspace": [],
+        "workspace_active": "",
     }
     try:
         data = json.loads(APP_SETTINGS.read_text(encoding="utf-8"))
@@ -1091,6 +1093,14 @@ class Bridge:
                     cleaned_map[str(host)] = [str(x) for x in ids][:200]
             if cleaned_map != self.app_settings.get("selected_by_host"):
                 updates["selected_by_host"] = cleaned_map
+        workspace = payload.get("workspace")
+        if isinstance(workspace, list):
+            cleaned_ws = [str(x) for x in workspace][:500]
+            if cleaned_ws != self.app_settings.get("workspace"):
+                updates["workspace"] = cleaned_ws
+        active = payload.get("workspace_active")
+        if isinstance(active, str) and active != self.app_settings.get("workspace_active"):
+            updates["workspace_active"] = active
         if updates:
             save_app_settings(updates)
             self.app_settings = load_app_settings()
@@ -1325,6 +1335,9 @@ class MainWindow(QMainWindow):
                              "selected": self.bridge.app_settings.get("selected", []),
                              "selected_by_host": self.bridge.app_settings.get(
                                  "selected_by_host", {}),
+                             "workspace": self.bridge.app_settings.get("workspace", []),
+                             "workspace_active": self.bridge.app_settings.get(
+                                 "workspace_active", ""),
                              "delete_remote": bool(
                                  self.bridge.app_settings.get("delete_remote", False))})
             self.bridge.push_state()
