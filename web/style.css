@@ -381,6 +381,9 @@ body.pointer-nav *:focus { outline: none; }
 .panel.collapsed #btn-open-logs,
 .panel.collapsed #btn-clear,
 .panel.collapsed .panel-resizer { display: none; }
+/* 收起后标题条本身就是开关 */
+.panel.collapsed .panel-head { cursor: pointer; }
+.panel.collapsed .panel-head:hover { background: var(--hover); }
 .log-search { width: 160px; height: 22px; font-size: 11px; }
 .log-level { height: 22px; font-size: 11px; padding: 0 4px; }
 .inline-check { display: flex; align-items: center; gap: 4px; font-size: 11px; text-transform: none; }

@@ -1425,6 +1425,12 @@ function bind() {
   document.getElementById("log-search").oninput = renderLog;
   document.getElementById("log-level").onchange = renderLog;
   document.getElementById("btn-toggle").onclick = () => setLogPanel(panelCollapsed);
+  // 收起后整条标题栏就是开关本身；按钮/输入框上的点击照旧走各自的处理
+  document.querySelector(".panel-head").addEventListener("click", event => {
+    if (!panelCollapsed) return;
+    if (event.target.closest("button, input, select, label")) return;
+    setLogPanel(true);
+  });
   document.getElementById("btn-new").onclick = () => send("new-project");
   document.getElementById("btn-settings").onclick = () => send("settings");
 
