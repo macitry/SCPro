@@ -373,6 +373,14 @@ body.pointer-nav *:focus { outline: none; }
   border-bottom: 1px solid var(--border);
   font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
 }
+/* 收起时只留标题条：日志区、筛选控件和拖拽条全部让位 */
+.panel.collapsed .log,
+.panel.collapsed .log-search,
+.panel.collapsed .log-level,
+.panel.collapsed .inline-check,
+.panel.collapsed #btn-open-logs,
+.panel.collapsed #btn-clear,
+.panel.collapsed .panel-resizer { display: none; }
 .log-search { width: 160px; height: 22px; font-size: 11px; }
 .log-level { height: 22px; font-size: 11px; padding: 0 4px; }
 .inline-check { display: flex; align-items: center; gap: 4px; font-size: 11px; text-transform: none; }

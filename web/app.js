@@ -24,12 +24,13 @@ const library = {
 };
 
 let panelHeight = 228;
+let panelCollapsed = false;
 let dragProjectId = null;
 
 const I18N = {
   zh: {
     "app.title": "SCPro",
-    "tab.hosts": "Hosts", "tab.log": "输出", "tab.settings": "设置",
+    "tab.hosts": "Hosts", "tab.settings": "设置",
     "hosts.header": "HOSTS", "hosts.search": "搜索 Host…", "hosts.settings": "Host 设置",
     "hosts.refresh": "从 ~/.ssh/config 刷新", "hosts.title": "Host 设置",
     "hosts.ignore": "忽略名单（每行一个通配模式，如 *-host）",
@@ -138,7 +139,7 @@ const I18N = {
   },
   en: {
     "app.title": "SCPro",
-    "tab.hosts": "Hosts", "tab.log": "Output", "tab.settings": "Settings",
+    "tab.hosts": "Hosts", "tab.settings": "Settings",
     "hosts.header": "HOSTS", "hosts.search": "Search hosts…", "hosts.settings": "Host settings",
     "hosts.refresh": "Sync from ~/.ssh/config", "hosts.title": "Host settings",
     "hosts.ignore": "Ignore list (one glob per line, e.g. *-host)",
@@ -265,10 +266,9 @@ function applyLanguage(lang) {
   document.querySelectorAll("[data-i18n-title]").forEach(node => {
     node.title = t(node.dataset.i18nTitle);
   });
-  const panel = document.getElementById("panel");
-  if (panel) {
+  if (document.getElementById("panel")) {
     document.getElementById("btn-toggle").title =
-      t(panel.style.display === "none" ? "panel.show" : "panel.hide");
+      t(panelCollapsed ? "panel.show" : "panel.hide");
   }
   document.title = t("app.title");
   if (editor && document.getElementById("ed-profile-btn")) updateTemplateButton();
@@ -336,7 +336,7 @@ window.scproTheme = function (payload) {
 window.scproUi = function (payload) {
   if (payload && payload.panel_h) {
     panelHeight = Math.max(120, payload.panel_h);
-    document.documentElement.style.setProperty("--panel-h", panelHeight + "px");
+    applyPanelHeight();
   }
   if (payload && payload.language) applyLanguage(payload.language);
   if (payload && typeof payload.delete_remote === "boolean") {
@@ -953,19 +953,29 @@ function openContextMenu(anchor, items) {
   menu.style.top = Math.max(8, top) + "px";
 }
 
-// 活动栏只有「输出」是真正的开关：面板开着才高亮。
-// 侧栏用 aria-expanded 表达状态，不再参与互斥高亮（那套模型在这里是假的）。
+// 输出面板只保留标题条上的一个开关：收起时整块缩成标题条本身，
+// 开关始终留在原位，不需要再从活动栏放一个重复的入口。
+function applyPanelHeight() {
+  const head = document.getElementById("panel").querySelector(".panel-head");
+  const bar = head.offsetHeight + 1;
+  document.documentElement.style.setProperty(
+    "--panel-h", (panelCollapsed ? bar : panelHeight) + "px");
+}
+
 function setLogPanel(visible) {
+  panelCollapsed = !visible;
   const panel = document.getElementById("panel");
-  panel.style.display = visible ? "flex" : "none";
-  panel.setAttribute("aria-hidden", visible ? "false" : "true");
-  const logButton = document.querySelector('.act[data-view="log"]');
-  logButton.classList.toggle("active", visible);
-  logButton.setAttribute("aria-pressed", visible ? "true" : "false");
+  panel.classList.toggle("collapsed", panelCollapsed);
+  panel.setAttribute("aria-hidden", panelCollapsed ? "true" : "false");
+  applyPanelHeight();
   const toggle = document.getElementById("btn-toggle");
-  toggle.textContent = visible ? "▾" : "▸";
-  toggle.title = t(visible ? "panel.hide" : "panel.show");
-  if (visible) panel.querySelector("#log").scrollTop = panel.querySelector("#log").scrollHeight;
+  toggle.textContent = panelCollapsed ? "▸" : "▾";
+  toggle.title = t(panelCollapsed ? "panel.show" : "panel.hide");
+  toggle.setAttribute("aria-expanded", panelCollapsed ? "false" : "true");
+  if (!panelCollapsed) {
+    const log = panel.querySelector("#log");
+    log.scrollTop = log.scrollHeight;
+  }
 }
 
 function toggleHostSidebar() {
@@ -1414,10 +1424,7 @@ function bind() {
   document.getElementById("btn-open-logs").onclick = () => send("open-log-dir");
   document.getElementById("log-search").oninput = renderLog;
   document.getElementById("log-level").onchange = renderLog;
-  document.getElementById("btn-toggle").onclick = () => {
-    const panel = document.getElementById("panel");
-    setLogPanel(panel.style.display === "none");
-  };
+  document.getElementById("btn-toggle").onclick = () => setLogPanel(panelCollapsed);
   document.getElementById("btn-new").onclick = () => send("new-project");
   document.getElementById("btn-settings").onclick = () => send("settings");
 
@@ -1497,17 +1504,7 @@ function bind() {
     });
     send("save-hosts", {ignore, ports, remove_ports});
   };
-  document.querySelectorAll(".act[data-view]").forEach(btn => {
-    btn.onclick = () => {
-      const view = btn.dataset.view;
-      if (view === "log") {
-        const panel = document.getElementById("panel");
-        setLogPanel(panel.style.display === "none");
-      } else if (view === "hosts") {
-        toggleHostSidebar();
-      }
-    };
-  });
+  document.querySelector('.act[data-view="hosts"]').onclick = toggleHostSidebar;
   setLogPanel(true);
 
   const search = document.getElementById("host-search");
@@ -1558,7 +1555,7 @@ function bind() {
     if (!resizing) return;
     panelHeight = Math.max(120, Math.min(window.innerHeight - 200,
                                          window.innerHeight - e.clientY - 24));
-    document.documentElement.style.setProperty("--panel-h", panelHeight + "px");
+    applyPanelHeight();
   });
   window.addEventListener("mouseup", () => {
     if (resizing) {
